@@ -1,0 +1,15 @@
+language: python
+python:
+  - "2.7"
+env:
+  - ENV=travis
+services:
+  - mysql
+  - memcached
+before_script:
+  - mysql -e 'drop database if exists test_olo'
+  - mysql -e 'create database test_olo'
+  - mysql -e 'grant all on *.* to travis@localhost'
+  - pip install -r requirements.txt
+  - pip install -r test-requirements.txt
+script: "pytest"

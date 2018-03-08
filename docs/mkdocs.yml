@@ -1,0 +1,32 @@
+site_name: OLO
+site_description: ORM based on the sqlstore.
+site_author: Guan Xipeng
+repo_name: subject/olo
+repo_url: https://github.com/douban/olo
+pages:
+  - 目录: index.md
+  - 前言: foreword.md
+  - 快速入门: quickstart.md
+  - Model: model.md
+  - Query: query.md
+  - CachedQuery: cached_query.md
+  - AST API: ast_api.md
+  - CacheWrapper: cache_wrapper.md
+  - Fields:
+      - Field: fields/field.md
+      - DbField: fields/db_field.md
+      - FieldType: fields/field_type.md
+  - Expressions:
+      - UnaryExpression: expressions/unary_expression.md
+      - BinaryExpression: expressions/binary_expression.md
+  - Extensions: exts.md
+  - ModelOptions: model_options.md
+  - Interfaces:
+      - SQLLiteralInterface: interfaces/sql_literal_interface.md
+theme: material
+extra:
+  palette:
+    primary: 'red'
+    accent: 'light blue'
+markdown_extensions:
+  - codehilite

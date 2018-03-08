@@ -1,0 +1,7 @@
+[run]
+omit = olo/libs/*,olo/local.py,olo/store.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
