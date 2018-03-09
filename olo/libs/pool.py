@@ -1,6 +1,8 @@
 import time
 import atexit
 import threading
+from itertools import chain
+from functools import wraps
 from Queue import Queue, Empty
 
 
@@ -22,6 +24,13 @@ class ConnProxy(object):
     def __getattr__(self, item):
         return getattr(self.conn, item)
 
+    def __str__(self):
+        return '<ConnProxy conn={}, pool={}>'.format(
+            self.conn, self.pool
+        )
+
+    __repr__ = __str__
+
     def close(self):
         self.conn.close()
         self.is_closed = True
@@ -40,26 +49,52 @@ class ConnProxy(object):
         self.release()
 
 
+def lock(func):
+    @wraps(func)
+    def _(self, *args, **kwargs):
+        with self.lock:
+            return func(self, *args, **kwargs)
+    return _
+
+
 class Pool(object):
-    def __init__(self, creator, timeout=60 * 60, queue_size=16):
+    def __init__(self, creator, timeout=60 * 60, queue_size=16,
+                 conn_proxy_cls=ConnProxy):
         self.lock = threading.RLock()
         self.creator = creator
         self.conns = {}
+        self.flying_conns = set()
         self.timeout = timeout
         self.queue_size = queue_size
+        self.conn_proxy_cls = conn_proxy_cls
         atexit.register(self.clear_conns)
 
+    def __str__(self):
+        return (
+            '<Pool timeout={}, queue_size={}, conn_count={}'
+            ', flying_conn_count={}>'
+        ).format(
+            self.timeout, self.queue_size, self.get_conn_count(),
+            len(self.flying_conns)
+        )
+
+    __repr__ = __str__
+
+    def get_conn_count(self):
+        return sum(q.qsize() for q in self.conns.itervalues())
+
+    @lock
     def get_q(self, ns=''):
-        with self.lock:
-            q = self.conns.get(ns)
-            if not q:
-                q = self.conns[ns] = Queue(maxsize=self.queue_size)
+        q = self.conns.get(ns)
+        if not q:
+            q = self.conns[ns] = Queue(maxsize=self.queue_size)
         return q
 
     def create_conn(self, ns=''):
         conn = self.creator()
-        return ConnProxy(conn, self, ns)
+        return self.conn_proxy_cls(conn, self, ns)
 
+    @lock
     def get_conn(self, ns=''):
         q = self.get_q(ns=ns)
 
@@ -77,20 +112,27 @@ class Pool(object):
             conn = self.create_conn(ns=ns)
 
         conn.is_release = False
+        self.flying_conns.add(conn)
 
         return conn
 
+    @lock
     def clear_conns(self):
-        with self.lock:
-            for _, v in self.conns.items():
-                while not v.empty():
-                    try:
-                        conn = v.get_nowait()
-                        conn.close()
-                    except Empty:
-                        pass
-            self.conns.clear()
+        conns = set()
+        for _, v in self.conns.iteritems():
+            while not v.empty():
+                try:
+                    conn = v.get_nowait()
+                    conns.add(conn)
+                except Empty:
+                    pass
+        for conn in chain(conns, self.flying_conns):
+            conn.close()
+        conns.clear()
+        self.conns.clear()
+        self.flying_conns.clear()
 
+    @lock
     def release_conn(self, conn):
         q = self.get_q(ns=conn.ns)
         if q.full() or conn.is_expired:
@@ -98,3 +140,5 @@ class Pool(object):
             return
         conn.is_release = True
         q.put_nowait(conn)
+        if conn in self.flying_conns:
+            self.flying_conns.remove(conn)
