@@ -7,7 +7,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-from benchmarks.config import mysql_cfg
+from config import mysql_cfg
 
 
 db_url = 'mysql://{user}:{passwd}@{host}:{port}/{db}'.format(**mysql_cfg)

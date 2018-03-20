@@ -1,12 +1,12 @@
-from benchmarks.olo_models import Ben as OBen
-from benchmarks.peewee_models import Ben as PBen
-from benchmarks.sqlalchemy_models import (
+from olo_models import Ben as OBen
+from peewee_models import Ben as PBen
+from sqlalchemy_models import (
     Ben as SBen,
     session
 )
 
-from benchmarks.utils import timer as _timer
-from benchmarks.config import get_mysql_conn
+from utils import timer as _timer
+from config import get_mysql_conn
 
 
 conn = get_mysql_conn()

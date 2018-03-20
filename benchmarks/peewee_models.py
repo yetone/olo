@@ -5,9 +5,10 @@ from peewee import (
     IntegerField,
 )
 
-from benchmarks.config import mysql_cfg
+from config import mysql_cfg
 
 
+mysql_cfg = dict(mysql_cfg)
 dbname = mysql_cfg.pop('db')
 db = MySQLDatabase(dbname, **mysql_cfg)
 

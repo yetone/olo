@@ -1,6 +1,6 @@
 
 from olo import MySQLDataBase, Model, Field
-from benchmarks.config import (  # noqa pylint:disable=W
+from config import (  # noqa pylint:disable=W
     MYSQL_HOST, MYSQL_PORT,
     MYSQL_USER, MYSQL_PASSWORD,
     MYSQL_DB, MYSQL_CHARSET,
