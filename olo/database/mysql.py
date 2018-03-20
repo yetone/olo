@@ -10,15 +10,21 @@ from olo.database import BaseDataBase, OLOCursor
 
 def get_conn(host, port, user, password, dbname, charset):
     try:
-        import pymysql
+        from MySQLdb import connect
+        conn = connect(
+            host=host, user=user, passwd=password, db=dbname,
+            charset=charset,
+        )
+    except ImportError:
+        from pymysql import connect
+        conn = connect(
+            host=host, user=user, password=password, db=dbname,
+            charset=charset,
+        )
     except ImportError:
         raise Exception(
             'Cannot found pymsql, please install it: pip install PyMySQL'
         )
-    conn = pymysql.connect(
-        host=host, user=user, password=password, db=dbname,
-        charset=charset,
-    )
     return conn
 
 

@@ -16,12 +16,12 @@ mysql_cfg = dict(
 
 
 def get_mysql_conn():
-    import pymysql
-    return pymysql.connect(
+    from MySQLdb import connect
+    return connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
-        password=MYSQL_PASSWORD,
+        passwd=MYSQL_PASSWORD,
         db=MYSQL_DB,
         charset=MYSQL_CHARSET
     )
