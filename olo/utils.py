@@ -9,7 +9,7 @@ from functools import wraps
 from ast import literal_eval
 from datetime import datetime, date
 
-from .compat import Decimal
+from olo.compat import Decimal
 
 
 def camel2underscore(name):

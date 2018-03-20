@@ -25,7 +25,7 @@ from olo.events import after_update, after_delete, after_insert, before_update
 from olo.context import Context, context, model_instantiate_context
 from olo.key import StrKey
 from olo.funcs import RAND
-from olo._speedups import parse_attrs
+from olo._speedups import parse_attrs, decrypt_attrs
 from olo.ext.exported import IS_EXPORTED_PROPERTY
 from olo.ext.n import N
 from olo.compat import with_metaclass
@@ -263,6 +263,7 @@ def _collect_fields(cls, attrs):
     exported_property_names = set()
     field_objs = []
     field_name_map = {}
+    encrypted_fields = {}
 
     for k in dir(cls):
         v = getattr(cls, k)
@@ -277,6 +278,8 @@ def _collect_fields(cls, attrs):
                     field_objs.append(v)
                 elif isinstance(v, DbField):
                     db_fields.add(k)
+                if isinstance(v, BaseField) and v.encrypt:
+                    encrypted_fields[k] = v
                 if v.choices is not None:
                     choices_field_sets.add(k)
             if v.is_primary_key():
@@ -307,7 +310,7 @@ def _collect_fields(cls, attrs):
         fields, db_fields, primary_key,
         on_updates, choices_field_sets, validates,
         exported_property_names, ordered_field_attr_names,
-        field_name_map,
+        field_name_map, encrypted_fields,
     )
 
 
@@ -379,6 +382,7 @@ class ModelMeta(type):
             exported_property_names,
             ordered_field_attr_names,
             field_name_map,
+            encrypted_fields,
         ) = _collect_fields(cls, attrs)
 
         cls.__fields__ = fields
@@ -389,6 +393,7 @@ class ModelMeta(type):
         cls.__exported_property_names__ = exported_property_names
         cls.__ordered_field_attr_names__ = ordered_field_attr_names
         cls.__field_name_map__ = field_name_map
+        cls.__encrypted_fields__ = encrypted_fields
 
         if '__table_name__' not in attrs:
             cls.__table_name__ = camel2underscore(class_name)
@@ -456,27 +461,15 @@ class ModelMeta(type):
         cls._lock = threading.RLock()
 
         old_init = attrs.get('__init__')
-        old_clone = attrs.get('_clone')
 
-        if old_init:
+        if old_init and getattr(old_init, '_override', False):
             @wraps(old_init)
             def wrapped_init(self, *args, **kwargs):
                 with model_instantiate_context(self.__ctx__):
                     return old_init(self, *args, **kwargs)
 
             cls.__init__ = wrapped_init
-
-        if old_clone:
-            clone_source = inspect.getsource(old_clone)
-            instantiate_in_clone = '.__class__(' in clone_source
-
-            @wraps(old_clone)
-            def wrapped_clone(self):
-                if instantiate_in_clone and self.__ctx__.in_model_instantiate:
-                    return copy(self)
-                return old_clone(self)
-
-            cls._clone = wrapped_clone
+            cls._olo_is_breaked = True
 
         cls.__ctx__ = Context()
 
@@ -520,35 +513,29 @@ class Model(with_metaclass(ModelMeta)):
     _olo_qs_idx = 0
 
     def __init__(self, _olo_is_new=None, _olo_decrypt=True, **attrs):
-        depth = self.__ctx__.instantiate_depth or 0
+        depth = 0
+        if getattr(self.__class__, '_olo_is_breaked', False):
+            depth = self.__ctx__.instantiate_depth or 0
         if not isinstance(_olo_is_new, bool):
             _olo_is_new = depth <= 1
         self._olo_is_new = _olo_is_new
-
-        self._check_attrs(attrs)
-        attrs = self._wash_attrs(attrs)
+        self._olo_decrypt = _olo_decrypt and not self._olo_is_new
 
         if self._olo_is_new:
+            self._check_attrs(attrs)
+            attrs = self._wash_attrs(attrs)
             attrs = self._olo_append_default_attrs(attrs)
 
-        _, sql_attrs, db_attrs = self._split_attrs(
-            attrs, collect_expression=False
-        )
+        if self.__encrypted_fields__ and self._olo_decrypt:
+            attrs = decrypt_attrs(self.__class__, attrs)
 
-        _olo_decrypt = _olo_decrypt and not self._olo_is_new
-
-        sql_attrs = self._parse_attrs(sql_attrs, decrypt=_olo_decrypt)
-        db_attrs = self._parse_attrs(db_attrs, decrypt=_olo_decrypt)
-
-        self._data = sql_attrs
         self._init()
-        self._db_data = db_attrs
+        self._data = attrs
 
     def _init(self):
-        self._db_data = {}
+        self._parsed_data = {}
         self._dirty_fields = set()
         self._orig = None
-        self._lock = threading.RLock()
 
     def _clone(self):
         return copy(self)
@@ -570,8 +557,7 @@ class Model(with_metaclass(ModelMeta)):
         dct = dict(self.__dict__)
         dct.pop('_dirty_fields', None)
         dct.pop('_orig', None)
-        dct.pop('_lock', None)
-        dct.pop('_db_data', None)
+        dct.pop('_parsed_data', None)
         dct = dict(dct)
         _data = dct.get('_data', {})
         if _data:
@@ -675,20 +661,17 @@ class Model(with_metaclass(ModelMeta)):
 
         sql_attrs = self._validate_attrs(sql_attrs, decrypt=False)
         db_attrs = self._validate_attrs(db_attrs, decrypt=False)
+        clean_attrs = dict(sql_attrs, **db_attrs)
 
         for k in db_attrs:
             # cache old db values
             getattr(self._orig, k, None)
 
         next_inst = self._clone()
-        next_inst.__setstate__(dict(self._data, **sql_attrs))
-        next_inst._db_data.update(db_attrs)
+        next_inst.__setstate__(dict(self._data, **clean_attrs))
         can_update = self._orig._will_update(
             next_inst,
-            fields=chain.from_iterable([
-                sql_attrs.iterkeys(),
-                db_attrs.iterkeys(),
-            ])
+            fields=clean_attrs.keys(),
         )
         if can_update is False:
             self._rollback()
@@ -740,8 +723,10 @@ class Model(with_metaclass(ModelMeta)):
 
         before_update.send(self)
 
-        self._data.update(sql_attrs)
-        self._db_data.update(db_attrs)
+        clean_attrs = dict(sql_attrs, **db_attrs)
+        self._data.update(clean_attrs)
+        for k in clean_attrs:
+            self._parsed_data.pop(k, None)
 
         for k, v in db_attrs.iteritems():
             field = getattr(self.__class__, k)
@@ -868,7 +853,12 @@ class Model(with_metaclass(ModelMeta)):
 
     @classmethod
     def _check_attrs(cls, attrs):
-        cls_attrs = set(dir(cls))
+        key = '_olo_dir_cache'
+
+        cls_attrs = cls.__dict__.get(key)
+        if cls_attrs is None:
+            cls_attrs = set(dir(cls))
+            setattr(cls, key, cls_attrs)
 
         invalid_attrs = set(attrs) - cls_attrs
 
@@ -912,10 +902,8 @@ class Model(with_metaclass(ModelMeta)):
         if before_create_is_instance_method:
             bcr = self.before_create()
 
-        sql_attrs = dict(self._data)
-        db_attrs = dict(self._db_data)
-
-        attrs = dict(sql_attrs, **db_attrs)
+        attrs = dict(self._data)
+        _, sql_attrs, db_attrs = self._split_attrs(attrs)
 
         if not before_create_is_instance_method:
             bcr = self.before_create(**attrs)  # pragma: no cover
@@ -923,7 +911,10 @@ class Model(with_metaclass(ModelMeta)):
         if bcr is False:
             return False
 
-        self._validate_attrs(attrs, parse=False)
+        self._validate_attrs(attrs, parse=True,
+                             decrypt=self._olo_decrypt)
+
+        db = self._get_db()
 
         expressions, _, _ = self._split_attrs(sql_attrs)
 
@@ -946,7 +937,6 @@ class Model(with_metaclass(ModelMeta)):
                 columns=', '.join(sql_pieces),
                 values=', '.join(['%s'] * len(params))
             )
-            db = self._get_db()
 
             try:
                 id_ = db.execute(sql, params)

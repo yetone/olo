@@ -125,23 +125,31 @@ class BaseField(object):
     def clone(self):
         return copy(self)
 
-    def _get_data(self, obj):
+    @classmethod
+    def _get_data(cls, obj):
         return obj._data
+
+    @classmethod
+    def _get_parsed_data(cls, obj):
+        return obj._parsed_data
 
     def __get__(self, obj, objtype):
         if obj is None:
             return self
         attr_name = self.attr_name
         data = self._get_data(obj)
+        parsed_data = self._get_parsed_data(obj)
+        if attr_name in parsed_data:
+            return parsed_data[attr_name]
         v = data.get(attr_name, missing)
         if v is not missing:
             if isinstance(v, Expression):
                 return v
-            if type_checker(self.type, v) or (v is None and self.noneable):
-                return v
-            v = transform_type(v, self.type)
+            if not type_checker(self.type, v) and (v is not None or not self.noneable):
+                v = transform_type(v, self.type)
             if self.output:
                 v = self.output(v)
+            parsed_data[attr_name] = v
             return v
         if self.noneable or obj._olo_is_new:
             return
@@ -162,6 +170,7 @@ class BaseField(object):
             obj._set_orig()
         attr_name = self.attr_name
         data = self._get_data(obj)
+        parsed_data = self._get_parsed_data(obj)
         attrs = {attr_name: value}
         parsed_attrs = obj._validate_attrs(attrs, decrypt=False, output=False)
         parsed_value = parsed_attrs[attr_name] if parsed_attrs else value
@@ -174,6 +183,7 @@ class BaseField(object):
         ):
             obj._dirty_fields.add(attr_name)
         data[attr_name] = parsed_value
+        parsed_data.pop(attr_name, None)
 
     def __repr__(self):
         return '{}(type={}, name={})'.format(
@@ -404,10 +414,6 @@ class DbField(BaseField):
         db_key = self._get_db_field_key(obj)
         db.db_delete(db_key)
 
-    @classmethod
-    def _get_data(cls, obj):
-        return obj._db_data
-
     def __get__(self, obj, objtype):
         if obj is None:
             return self
@@ -470,5 +476,7 @@ class DbField(BaseField):
             v = getattr(self, '_delete_v{}'.format(version.to_version))(obj)  # noqa
             v = getattr(self, '_delete_v{}'.format(version.from_version))(obj)  # noqa
         data = self._get_data(obj)
+        parsed_data = self._get_parsed_data(obj)
         data.pop(attr_name, None)
+        parsed_data.pop(attr_name, None)
         obj.after_update()

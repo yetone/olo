@@ -189,7 +189,7 @@ class TestDbField(TestCase):
     def test_get_v0(self):
         ver = Foo.prop1.version
         f = Foo.create(prop1=[1])
-        f._db_data.clear()
+        f._data.pop('prop1')
         db = f._get_db()
         uuid = f.get_finally_uuid()
         db.db_set(uuid, '{"prop1": [2]}')
@@ -202,7 +202,7 @@ class TestDbField(TestCase):
     def test_set_v0(self):
         ver = Foo.prop1.version
         f = Foo.create(prop1=[1])
-        f._db_data.clear()
+        f._data.pop('prop1')
         db = f._get_db()
         uuid = f.get_finally_uuid()
         db.db_set(uuid, '{"prop1": [2]}')

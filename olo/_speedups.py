@@ -32,3 +32,12 @@ def parse_attrs(cls, attrs, decrypt=True, output=True):
                 v = field.output(v) if field.output else v
         res[k] = v
     return res
+
+
+def decrypt_attrs(cls, attrs):
+    res = dict(attrs)
+    for name, field in cls.__encrypted_fields__.iteritems():
+        if name not in res:
+            continue
+        res[name] = field.decrypt_func(res[name])
+    return res
