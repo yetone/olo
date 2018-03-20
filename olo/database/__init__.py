@@ -64,7 +64,8 @@ class OLOCursor(object):
             kwargs['called_from_store'] = kwargs.pop('called_from_store', True)
         r = self.cur.execute(sql, *args, **kwargs)
         params = args[0] if args else None
-        log_sql(self.cur, sql, params)
+        if self.db.enable_log:
+            log_sql(self.cur, sql, params)
         return r
 
     def close(self):
