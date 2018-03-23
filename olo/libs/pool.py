@@ -1,17 +1,13 @@
 import time
-import atexit
+import weakref
 import threading
-from itertools import chain
-from functools import wraps
-from Queue import Queue, Empty
 
 
 class ConnProxy(object):
-    def __init__(self, conn, pool, ns):
+    def __init__(self, conn, pool):
         self.conn = conn
         self.pool = pool
         self.expire_time = time.time() + pool.timeout
-        self.ns = ns
         self.is_closed = False
         self.is_release = False
 
@@ -35,110 +31,53 @@ class ConnProxy(object):
         self.conn.close()
         self.is_closed = True
 
-    def release(self):
-        self.pool.release_conn(self)
-
     @property
     def is_expired(self):
         return self.expire_time <= time.time()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        self.release()
-
-
-def lock(func):
-    @wraps(func)
-    def _(self, *args, **kwargs):
-        with self.lock:
-            return func(self, *args, **kwargs)
-    return _
-
 
 class Pool(object):
-    def __init__(self, creator, timeout=60 * 60, queue_size=16,
+    def __init__(self, creator, timeout=60 * 60,
                  conn_proxy_cls=ConnProxy):
-        self.lock = threading.RLock()
+        self.local = threading.local()
+        self.reset_local()
         self.creator = creator
-        self.conns = {}
-        self.flying_conns = set()
         self.timeout = timeout
-        self.queue_size = queue_size
         self.conn_proxy_cls = conn_proxy_cls
-        atexit.register(self.clear_conns)
 
     def __str__(self):
         return (
-            '<Pool timeout={}, queue_size={}, conn_count={}'
-            ', flying_conn_count={}>'
-        ).format(
-            self.timeout, self.queue_size, self.get_conn_count(),
-            len(self.flying_conns)
-        )
+            '<Pool timeout={}>'
+        ).format(self.timeout)
 
     __repr__ = __str__
 
-    def get_conn_count(self):
-        return sum(q.qsize() for q in self.conns.itervalues())
+    def reset_local(self):
+        self.local.conn = lambda: None
 
-    @lock
-    def get_q(self, ns=''):
-        q = self.conns.get(ns)
-        if not q:
-            q = self.conns[ns] = Queue(maxsize=self.queue_size)
-        return q
-
-    def create_conn(self, ns=''):
+    def create_conn(self):
         conn = self.creator()
-        return self.conn_proxy_cls(conn, self, ns)
+        return self.conn_proxy_cls(conn, self)
 
-    @lock
-    def get_conn(self, ns=''):
-        q = self.get_q(ns=ns)
+    def get_conn(self):
+        conn = self.local.conn()
 
-        try:
-            conn = q.get_nowait()
+        if not conn:
+            conn = self.create_conn()
+            self.local.conn = weakref.ref(conn)
 
-            if conn.is_closed:
-                return self.get_conn(ns=ns)
+        if conn.is_closed:
+            self.reset_local()
+            return self.get_conn()
 
-            if conn.is_expired:
-                conn.close()
-                return self.get_conn(ns=ns)
-
-        except Empty:
-            conn = self.create_conn(ns=ns)
-
-        conn.is_release = False
-        self.flying_conns.add(conn)
+        if conn.is_expired:
+            conn.close()
+            self.reset_local()
+            return self.get_conn()
 
         return conn
 
-    @lock
     def clear_conns(self):
-        conns = set()
-        for _, v in self.conns.iteritems():
-            while not v.empty():
-                try:
-                    conn = v.get_nowait()
-                    conns.add(conn)
-                except Empty:
-                    pass
-        for conn in chain(conns, self.flying_conns):
-            conn.close()
-        conns.clear()
-        self.conns.clear()
-        self.flying_conns.clear()
-
-    @lock
-    def release_conn(self, conn):
-        q = self.get_q(ns=conn.ns)
-        if q.full() or conn.is_expired:
-            conn.close()
-            return
-        conn.is_release = True
-        q.put_nowait(conn)
-        if conn in self.flying_conns:
-            self.flying_conns.remove(conn)
+        conn = self.get_conn()
+        conn.close()
+        self.reset_local()

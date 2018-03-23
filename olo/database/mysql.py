@@ -29,9 +29,9 @@ def get_conn(host, port, user, password, dbname, charset):
 
 
 class MySQLConnProxy(ConnProxy):
-    def __init__(self, conn, pool, ns):
+    def __init__(self, conn, pool):
         super(MySQLConnProxy, self).__init__(
-            conn, pool, ns
+            conn, pool
         )
         self.modified_cursors = set()
         self.waiting_for_close = False
@@ -124,23 +124,21 @@ class MySQLDataBase(BaseDataBase):
         ), conn_proxy_cls=MySQLConnProxy)
         self.modified_cursors = ThreadedObject(Queue)
 
-    def get_conn(self, table='*'):
-        return self.pool.get_conn(ns=table)
+    def get_conn(self):
+        return self.pool.get_conn()
 
-    def get_cursor(self, table='*'):  # pylint: disable=W
-        with self.get_conn(table=table) as conn:
-            cur = conn.cursor()
-            return OLOCursor(cur, self)
+    def get_cursor(self):  # pylint: disable=W
+        conn = self.get_conn()
+        cur = conn.cursor()
+        return OLOCursor(cur, self)
 
     def sql_execute(self, sql, params=None, **kwargs):  # pylint: disable=W
         cmd = None
-        table = '*'
         try:
-            # FIXME: I don't known why ns must be cost value
             cmd, _ = parse_execute_sql(sql)
         except Exception:  # pylint: disable=W
             pass
-        cur = self.get_cursor(table=table)
+        cur = self.get_cursor()
         res = cur.execute(sql, params, **kwargs)
         if cmd == 'select':
             return cur.fetchall()
