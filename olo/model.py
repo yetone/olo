@@ -561,7 +561,12 @@ class Model(with_metaclass(ModelMeta)):
         dct = dict(dct)
         _data = dct.get('_data', {})
         if _data:
-            dct['_data'] = dict(_data)
+            _data = {
+                k: v
+                for k, v in _data.iteritems()
+                if k not in self.__db_fields__
+            }
+            dct['_data'] = _data
         # Return tuple to distinguish the old version
         return (dct,)
 
