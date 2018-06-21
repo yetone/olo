@@ -7,7 +7,7 @@ from datetime import datetime, date
 from olo.compat import Decimal
 from olo.utils import (
     type_checker, transform_type, Missing, ThreadedObject,
-    upper_keywords, friendly_repr,
+    friendly_repr,
 )
 from .base import TestCase
 
@@ -96,14 +96,6 @@ class TestUtils(TestCase):
         v = pickle.dumps(a)
         _a = pickle.loads(v)
         self.assertEqual(_a.name, 'A')
-
-    def test_upper_keywords(self):
-        self.assertEqual(
-            upper_keywords(
-                'select a from b where c'
-            ),
-            'SELECT a FROM b WHERE c'
-        )
 
     def test_friendly_repr(self):
         self.assertEqual(friendly_repr(1), '1')
