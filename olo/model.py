@@ -538,7 +538,11 @@ class Model(with_metaclass(ModelMeta)):
         self._orig = None
 
     def _clone(self):
-        return copy(self)
+        r = copy(self)
+        for k, v in self._data.iteritems():
+            if k in self.__db_fields__:
+                r._data[k] = copy(v)
+        return r
 
     def _set_orig(self):
         if self._olo_is_new:
@@ -561,7 +565,11 @@ class Model(with_metaclass(ModelMeta)):
         dct = dict(dct)
         _data = dct.get('_data', {})
         if _data:
-            dct['_data'] = dict(_data)
+            dct['_data'] = {
+                k: v
+                for k, v in _data.iteritems()
+                if k not in self.__db_fields__
+            }
         # Return tuple to distinguish the old version
         return (dct,)
 
