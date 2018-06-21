@@ -66,109 +66,92 @@ keywords = {
 }
 
 
-# crude implementation
-def upper_keywords(sql):
-    l = [sql] + list(keywords)
-    return reduce(
-        lambda x, y: (
-            re.sub(
-                r'(\s+|[:punct:]+|^){}(\(|\s+|[:punct:]+|$)'.format(y),
-                r'\1{}\2'.format(y.upper()),
-                x,
-                flags=re.IGNORECASE
-            )
-        ), l)
-
-
-def type_checker(type_, v):
-    if isinstance(type_, type) and isinstance(v, type_):
+def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
+    if isinstance(type_, type) and isinstance(obj, type_):
         return True
     t = type(type_)
-    if t != type(v):
+    if t != type(obj):
         return False
     if t is list:
-        if len(type_) == 0:
-            return isinstance(v, t)
+        if not type_:
+            return isinstance(obj, t)
         _t = type_[0]
-        for e in v:
+        for e in obj:
             r = type_checker(_t, e)
             if not r:
                 return False
         return True
     elif t is tuple:
-        if len(type_) != len(v):
+        if len(type_) != len(obj):
             return False
-        for i, e in enumerate(v):
+        for i, e in enumerate(obj):
             r = type_checker(type_[i], e)
             if not r:
                 return False
         return True
     elif t is dict:
         items = type_.items()
-        if len(items) == 0:
-            return isinstance(v, t)
+        if not items:
+            return isinstance(obj, t)
         kt, vt = items[0]
-        for k, v in v.iteritems():
+        for k, v in obj.iteritems():
             if not type_checker(kt, k) or not type_checker(vt, v):
                 return False
         return True
     return False
 
 
-def transform_type(v, type_):
-    if isinstance(type_, type) and isinstance(v, type_):
-        return v
+def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
+    if isinstance(type_, type) and isinstance(obj, type_):
+        return obj
     if type_ is str:
-        if isinstance(v, unicode):
-            return v.encode('utf-8')
-        elif isinstance(v, (list, dict)):
-            return json.dumps(v)
-        return type_(v)
+        if isinstance(obj, unicode):
+            return obj.encode('utf-8')
+        elif isinstance(obj, (list, dict)):
+            return json.dumps(obj)
+        return type_(obj)
     if type_ is unicode:
-        if isinstance(v, str):
-            return v.decode('utf-8')
-        return type_(v)
+        if isinstance(obj, str):
+            return obj.decode('utf-8')
+        return type_(obj)
     if type_ in (list, dict):
-        if isinstance(v, basestring):
-            v = json.loads(v)
-            if isinstance(v, type_):
-                return v
-        return type_(v)
+        if isinstance(obj, basestring):
+            obj = json.loads(obj)
+            if isinstance(obj, type_):
+                return obj
+        return type_(obj)
     if type_ in (datetime, date):
-        v = dateparser.parse(v)
+        obj = dateparser.parse(obj)
         if type_ is date:
-            return v.date()
-        return v
+            return obj.date()
+        return obj
     if type_ is tuple:
-        if isinstance(v, basestring):
-            v = literal_eval(v)
-            if isinstance(v, type_):
-                return v
-        return tuple(v)
+        if isinstance(obj, basestring):
+            obj = literal_eval(obj)
+            if isinstance(obj, type_):
+                return obj
+        return tuple(obj)
     if callable(type_):
         if type_ is Decimal:
-            return type_(str(v))
-        return type_(v)
+            return type_(str(obj))
+        return type_(obj)
     t = type(type_)
-    if t in (list, dict) and isinstance(v, basestring):
-        v = json.loads(v)
-    if not isinstance(v, t):
-        raise TypeError('{} is not a {} type.'.format(repr(v), t))
-    if isinstance(v, list):
-        l = []
-        for e in v:
-            l.append(transform_type(e, type_[0]))
-        return l
-    elif isinstance(v, dict):
+    if t in (list, dict) and isinstance(obj, basestring):
+        obj = json.loads(obj)
+    if not isinstance(obj, t):
+        raise TypeError('{} is not a {} type.'.format(repr(obj), t))
+    if isinstance(obj, list):
+        return [transform_type(e, type_[0]) for e in obj]
+    elif isinstance(obj, dict):
         d = {}
         items = type_.items()
         kt, vt = items[0]
-        for k, v in v.iteritems():
+        for k, v in obj.iteritems():
             k = transform_type(k, kt)
             v = transform_type(v, vt)
             d[k] = v
         return d
-    return v
+    return obj
 
 
 class ThreadedObject(object):
