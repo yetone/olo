@@ -12,4 +12,6 @@ before_script:
   - mysql -e 'grant all on *.* to travis@localhost'
   - pip install -r requirements.txt
   - pip install -r test-requirements.txt
-script: "pytest"
+script:
+  - pytest
+  - pylint --rcfile=pylintrc olo
