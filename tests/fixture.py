@@ -22,7 +22,7 @@ BEANSDB_CFG = {
 MYSQL_HOST = 'localhost'
 MYSQL_PORT = 3306
 MYSQL_USER = 'travis' if in_travis else 'root'
-MYSQL_PASSWORD = '' if in_travis else '123'
+MYSQL_PASSWORD = '' if in_travis else os.getenv('MYSQL_PASSWORD', 'root')
 MYSQL_DB = 'test_olo'
 MYSQL_CHARSET = 'utf8mb4'
 
@@ -69,6 +69,9 @@ def setup_mysql_conn():
         mysql_conn.close()
 
     mysql_conn = get_mysql_conn()
+    cur = mysql_conn.cursor()
+    cur.execute('SET GLOBAL sql_mode = ""')
+    mysql_conn.commit()
 
 
 def rollback_all():
@@ -223,6 +226,8 @@ def change_for_test(sql):
 
 
 RE_FULLTEXT = re.compile(r'(?im)(,\n\s*FULLTEXT KEY[^,\n]*)(?=,|\n)')
+
+
 def remove_fulltext_key(sql):
     # `FULLTEXT indexes are supported only for MyISAM tables ...'
     #  -- http://dev.mysql.com/doc/refman/5.0/en/create-index.html
