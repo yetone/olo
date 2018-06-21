@@ -26,7 +26,7 @@ def order_by_to_strs(order_by):
 
 class CachedQuery(Query):
 
-    def _can_be_cached(self):
+    def _can_be_cached(self):  # pylint: disable=too-many-return-statements
         if self._having_expressions:
             return False
         if self._on_expressions:
