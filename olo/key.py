@@ -6,7 +6,7 @@ class Key(tuple):
         if PY2:
             super(Key, self).__init__(*args, **kwargs)
         else:
-            super().__init__()
+            super().__init__()  # pylint: disable=missing-super-argument
         self.hashed_value = self.get_hashed_value()
 
     def get_hashed_value(self):
