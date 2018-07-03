@@ -5,6 +5,7 @@ from __future__ import absolute_import, print_function, division
 import operator
 from functools import update_wrapper
 
+from olo.compat import reduce
 from olo.libs.compiler.utils import throw
 from olo.libs.compiler.eval import eval_src, get_prelude
 from olo.libs.compiler.translators.ast_translator import ASTTranslator

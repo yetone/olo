@@ -1,5 +1,6 @@
 from olo.field import ConstField, UnionField
 from olo.errors import ValidationError, DbFieldVersionError
+from olo.compat import xrange
 
 from .base import TestCase, Dummy, Foo
 from .utils import patched_db_get, patched_db_get_multi

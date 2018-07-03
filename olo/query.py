@@ -3,9 +3,10 @@ import sys
 import types
 import operator
 
-from itertools import izip, imap, chain
+from itertools import chain
 from decorator import decorator
 
+from olo.compat import izip, imap, basestring, iteritems, reduce
 from olo.interfaces import SQLLiteralInterface
 from olo.field import Field
 from olo.errors import ExpressionError, OrderByError, SupportError
@@ -31,7 +32,7 @@ def _strip_backquote(s):
 def _dict_to_expressions(model_class, dct):
     return [
         getattr(model_class, k) == v
-        for k, v in dct.iteritems()
+        for k, v in iteritems(dct)
     ]
 
 
@@ -137,7 +138,7 @@ class Query(SQLLiteralInterface):
             if start:
                 q = q.offset(start)
             if stop is not None:
-                if start or stop != sys.maxint:
+                if start or stop != sys.maxsize:
                     q = q.limit(stop - start)
             return q.all()
         field = self._model_class.get_singleness_pk_field()
@@ -463,7 +464,10 @@ class Query(SQLLiteralInterface):
                 producers.append((
                     lambda idx, v:
                     lambda item: v._olo_instantiate(**dict(
-                        izip(v.__fields__, item[idx: idx + fields_count])  # pylint: disable=W
+                        izip(
+                            v.__sorted_fields__,
+                            item[idx: idx + fields_count]
+                        )  # pylint: disable=W
                     ))
                 )(idx, v))
                 idx += fields_count - 1

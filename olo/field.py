@@ -2,9 +2,9 @@
 
 import json
 from copy import copy
-from itertools import izip
 from collections import defaultdict
 
+from olo.compat import int_types, iteritems, izip, basestring
 from olo.interfaces import SQLLiteralInterface
 from olo.expression import Expression, UnaryExpression, BinaryExpression
 from olo.libs.aes import encrypt, decrypt
@@ -62,6 +62,9 @@ class BaseField(object):
         self._alias_name = None
         self._model_ref = lambda: None
 
+    def __hash__(self):
+        return self.id
+
     def get_model(self):
         if not self._model_ref:
             return
@@ -112,7 +115,7 @@ class BaseField(object):
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        for k, v in state.iteritems():
+        for k, v in iteritems(state):
             if isinstance(v, (list, set, dict)):
                 v = type(v)(v)
                 state[k] = v
@@ -286,7 +289,7 @@ def _prefetch_db_data(obj):
     if len(entities) < 2:
         return
     qs_idx = getattr(obj, '_olo_qs_idx', None)
-    qs_idx = 0 if not isinstance(qs_idx, (int, long)) else qs_idx
+    qs_idx = 0 if not isinstance(qs_idx, int_types) else qs_idx
     if qs_idx < 1:
         return
     pairs = []
@@ -322,7 +325,7 @@ def _get_db_values(pairs):
     if not version_groups:
         return
     mapping = {}
-    for version, _pairs in version_groups.iteritems():
+    for version, _pairs in iteritems(version_groups):
         for obj, field in _pairs:
             if version == 0:
                 key = obj.get_finally_uuid()

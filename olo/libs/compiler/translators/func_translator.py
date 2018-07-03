@@ -2,8 +2,8 @@
 
 import types
 import inspect
-from itertools import izip
 
+from olo.compat import izip
 from olo.libs.decompiling import decompile
 from olo.libs.compiler.translators.ast_translator import (
     priority, PythonTranslator
@@ -118,8 +118,8 @@ def transform_func(func):
         ast.src
     )
 
-    globals = func.func_globals
-    if func.func_closure:
+    globals = func.__globals__
+    if func.__closure__:
         globals = dict(globals, **dict(
             izip(
                 func.func_code.co_freevars,

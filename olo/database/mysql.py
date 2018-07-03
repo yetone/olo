@@ -1,5 +1,6 @@
 from threading import Timer
-from Queue import Queue, Empty
+
+from olo.compat import Queue, Empty
 
 from olo.libs.pool import Pool, ConnProxy
 from olo.libs.class_proxy import ClassProxy

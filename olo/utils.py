@@ -9,7 +9,9 @@ from functools import wraps
 from ast import literal_eval
 from datetime import datetime, date
 
-from olo.compat import Decimal
+from olo.compat import (
+    PY2, Decimal, unicode, iteritems, basestring, items_list
+)
 
 
 def camel2underscore(name):
@@ -90,11 +92,11 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
                 return False
         return True
     elif t is dict:
-        items = type_.items()
+        items = items_list(type_)
         if not items:
             return isinstance(obj, t)
         kt, vt = items[0]
-        for k, v in obj.iteritems():
+        for k, v in iteritems(obj):
             if not type_checker(kt, k) or not type_checker(vt, v):
                 return False
         return True
@@ -144,9 +146,9 @@ def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
         return [transform_type(e, type_[0]) for e in obj]
     elif isinstance(obj, dict):
         d = {}
-        items = type_.items()
+        items = items_list(type_)
         kt, vt = items[0]
-        for k, v in obj.iteritems():
+        for k, v in iteritems(obj):
             k = transform_type(k, kt)
             v = transform_type(v, vt)
             d[k] = v
@@ -242,7 +244,7 @@ UNARY_NEG_OPERATOR = {
 
 UNARY_NEG_OPERATOR = dict({
     v: k
-    for k, v in UNARY_NEG_OPERATOR.iteritems()
+    for k, v in iteritems(UNARY_NEG_OPERATOR)
 }, **UNARY_NEG_OPERATOR)
 
 
@@ -257,7 +259,7 @@ BINARY_NEG_OPERATOR = {
 
 BINARY_NEG_OPERATOR = dict({
     v: k
-    for k, v in BINARY_NEG_OPERATOR.iteritems()
+    for k, v in iteritems(BINARY_NEG_OPERATOR)
 }, **BINARY_NEG_OPERATOR)
 
 
@@ -302,6 +304,8 @@ def get_sql_pieces_and_params(exps, coerce=str):
 
 
 def friendly_repr(v):
+    if not PY2:
+        return repr(v)
     if isinstance(v, unicode):
         return "u'%s'" % v.encode('utf-8')
     if isinstance(v, bytes):
@@ -367,3 +371,7 @@ def parse_execute_sql(sql):
     table = match.group('table')
 
     return cmd, table
+
+
+def get_thread_ident():
+    return threading.currentThread().ident

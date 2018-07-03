@@ -4,7 +4,7 @@ import pickle
 
 from datetime import datetime, date
 
-from olo.compat import Decimal
+from olo.compat import PY2, Decimal, basestring, unicode
 from olo.utils import (
     type_checker, transform_type, Missing, ThreadedObject,
     friendly_repr,
@@ -99,5 +99,8 @@ class TestUtils(TestCase):
 
     def test_friendly_repr(self):
         self.assertEqual(friendly_repr(1), '1')
-        self.assertEqual(friendly_repr('aaa'), "b'aaa'")
-        self.assertEqual(friendly_repr(u'aaa'), "u'aaa'")
+        if PY2:
+            self.assertEqual(friendly_repr('aaa'), "b'aaa'")
+            self.assertEqual(friendly_repr(u'aaa'), "u'aaa'")
+        else:
+            self.assertEqual(friendly_repr('aaa'), "'aaa'")

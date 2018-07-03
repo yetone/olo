@@ -4,9 +4,7 @@ import io
 import sys
 import types
 
-from olo.compat import imap
-
-from olo.compat import pickle
+from olo.compat import imap, pickle, basestring
 
 
 def throw(exp, *args):

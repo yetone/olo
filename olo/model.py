@@ -5,7 +5,7 @@ import threading
 from copy import copy
 from functools import wraps
 from datetime import datetime, date
-from itertools import izip, chain, product
+from itertools import chain, product
 
 from olo.utils import (
     camel2underscore, deprecation, type_checker, missing,
@@ -28,7 +28,10 @@ from olo.funcs import RAND
 from olo._speedups import parse_attrs, decrypt_attrs
 from olo.ext.exported import IS_EXPORTED_PROPERTY
 from olo.ext.n import N
-from olo.compat import with_metaclass
+from olo.compat import (
+    with_metaclass, xrange, long, basestring, izip,
+    iteritems, iterkeys, itervalues, values_list,
+)
 
 
 VALID_TYPES = (basestring, int, float, long, date)
@@ -54,7 +57,7 @@ def _product_order_by_tuples(key):
         return []
     x = list(product(strs, ('-', '')))
     d = len(x) / l
-    pieces = [x[i * d: (i + 1) * d] for i in xrange(l)]
+    pieces = [x[int(i * d): int((i + 1) * d)] for i in xrange(l)]
     pieces = list(product(*pieces))
     return [tuple('%s%s' % (t[1], t[0]) for t in p)
             for p in pieces]
@@ -102,7 +105,7 @@ class ModelOptions(object):
             return self.db.report(*args, **kwargs)
 
     def update(self, **kwargs):
-        options = {k: v for k, v in kwargs.iteritems()
+        options = {k: v for k, v in iteritems(kwargs)
                    if not k.startswith('_')}
         self.__dict__.update(options)
 
@@ -163,10 +166,10 @@ def _get_keys_from_db(cls):
 
         key = _process_key(
             cls,
-            map(
-                lambda (s, n): n,  # noqa
-                sorted(pieces, key=lambda (s, n): s)  # noqa
-            )
+            list(map(
+                lambda t: t[1],  # noqa
+                sorted(pieces, key=lambda t: t[0])  # noqa
+            ))
         )
 
         if key is None:
@@ -225,7 +228,7 @@ def _create_n_property(method, name):
 
         if isinstance(res, dict):
 
-            for pv, item in entity_mapping.iteritems():
+            for pv, item in iteritems(entity_mapping):
                 if hasattr(item, '_olo_qs'):
                     setattr(item, name, res.get(pv, default))
 
@@ -332,7 +335,7 @@ class ModelMeta(type):
 
     def __new__(mcs, class_name, bases, attrs):
         finals = []
-        for k, v in attrs.iteritems():
+        for k, v in iteritems(attrs):
             if (
                 k in mcs._finals and
                 not getattr(v, '_override', False)
@@ -360,7 +363,7 @@ class ModelMeta(type):
             options.update(meta.__dict__)
 
         options = {
-            k: v for k, v in options.iteritems()
+            k: v for k, v in iteritems(options)
             if not k.startswith('_')
         }
 
@@ -485,6 +488,10 @@ class ModelMeta(type):
     def cache(cls):
         return cls._options.cache_class(cls)
 
+    @readonly_cached_property
+    def __sorted_fields__(cls):
+        return sorted(cls.__fields__, key=lambda x: getattr(cls, x).id)
+
     @classmethod
     def final(mcs, method):
         name = getattr(method, '__name__', None)
@@ -497,7 +504,7 @@ class ModelMeta(type):
 
 
 def final_methods(cls):
-    for v in cls.__dict__.itervalues():
+    for v in itervalues(cls.__dict__):
         if inspect.isfunction(v):
             ModelMeta.final(v)
     return cls
@@ -539,7 +546,7 @@ class Model(with_metaclass(ModelMeta)):
 
     def _clone(self):
         r = copy(self)
-        for k, v in self._data.iteritems():
+        for k, v in iteritems(self._data):
             if k in self.__db_fields__:
                 r._data[k] = copy(v)
         return r
@@ -567,7 +574,7 @@ class Model(with_metaclass(ModelMeta)):
         if _data:
             dct['_data'] = {
                 k: v
-                for k, v in _data.iteritems()
+                for k, v in iteritems(_data)
                 if k not in self.__db_fields__
             }
         # Return tuple to distinguish the old version
@@ -597,7 +604,7 @@ class Model(with_metaclass(ModelMeta)):
                 getattr(cls, field_name).validate(v)
 
     def _check_validates(self, attrs):
-        for field_name, validate in self.__validates__.iteritems():
+        for field_name, validate in iteritems(self.__validates__):
             v = attrs.get(field_name, missing)
             if v is not missing:
                 validate(v)
@@ -653,7 +660,7 @@ class Model(with_metaclass(ModelMeta)):
         db = self._get_db()
 
         need_updates = {}
-        for k, v in self.__on_updates__.iteritems():
+        for k, v in iteritems(self.__on_updates__):
             if k in attrs:
                 continue
 
@@ -718,7 +725,7 @@ class Model(with_metaclass(ModelMeta)):
                 exp for exp in expressions if isinstance(exp.right, Expression)
             ]
             if dynamic_exps:
-                keys = map(lambda x: x.left.attr_name, dynamic_exps)
+                keys = list(map(lambda x: x.left.attr_name, dynamic_exps))
                 q = self.__class__.query(*keys).filter(**{
                     attr_name: getattr(self, attr_name)
                     for attr_name in self.__primary_key__
@@ -736,7 +743,7 @@ class Model(with_metaclass(ModelMeta)):
         for k in clean_attrs:
             self._parsed_data.pop(k, None)
 
-        for k, v in db_attrs.iteritems():
+        for k, v in iteritems(db_attrs):
             field = getattr(self.__class__, k)
             field.db_set(self, v)
 
@@ -751,8 +758,8 @@ class Model(with_metaclass(ModelMeta)):
                 self._did_update(
                     _orig,
                     fields=chain.from_iterable([
-                        sql_attrs.iterkeys(),
-                        db_attrs.iterkeys(),
+                        iterkeys(sql_attrs),
+                        iterkeys(db_attrs),
                     ])
                 )
 
@@ -847,7 +854,7 @@ class Model(with_metaclass(ModelMeta)):
         expressions = []
         sql_attrs = {}
         db_attrs = {}
-        for k, v in attrs.iteritems():
+        for k, v in iteritems(attrs):
             if k in cls.__db_fields__:
                 db_attrs[k] = v
             elif k in cls.__fields__:
@@ -882,7 +889,7 @@ class Model(with_metaclass(ModelMeta)):
     def _wash_attrs(cls, attrs):
         return {
             k: v
-            for k, v in attrs.iteritems()
+            for k, v in iteritems(attrs)
             if v is not missing
         }
 
@@ -890,7 +897,7 @@ class Model(with_metaclass(ModelMeta)):
     def _map_attrs(cls, attrs):
         return {  # pragma: no cover
             getattr(cls, k).name: v
-            for k, v in attrs.iteritems()
+            for k, v in iteritems(attrs)
         }
 
     @classmethod
@@ -967,7 +974,7 @@ class Model(with_metaclass(ModelMeta)):
             # need thinking
             self._extend_missing_data()
 
-        for k, v in db_attrs.iteritems():
+        for k, v in iteritems(db_attrs):
             field = getattr(self.__class__, k)
             field.db_set(self, v)
 
@@ -1083,7 +1090,7 @@ class Model(with_metaclass(ModelMeta)):
             ident = idents[0]
             items = cls._get_multi_by(
                 UnionField(*[getattr(cls, k) for k in ident])
-                .in_([_ident.values() for _ident in idents])
+                .in_([values_list(_ident) for _ident in idents])
             )
             mapping = {
                 tuple(
@@ -1217,7 +1224,7 @@ class Model(with_metaclass(ModelMeta)):
         )
         if attr_name not in cls.__dict__:
             sql_pieces, _ = get_sql_pieces_and_params(
-                map(lambda x: getattr(cls, x), cls.__fields__)
+                map(lambda x: getattr(cls, x), cls.__sorted_fields__)
             )
             setattr(cls, attr_name, ', '.join(sql_pieces))
         return getattr(cls, attr_name)
@@ -1255,7 +1262,7 @@ class Model(with_metaclass(ModelMeta)):
     @classmethod
     def _deparse_attrs(cls, attrs):
         res = {}
-        for k, v in attrs.iteritems():
+        for k, v in iteritems(attrs):
             field = getattr(cls, k)
             is_field = isinstance(field, Field)
             if not isinstance(v, Expression):
@@ -1287,7 +1294,7 @@ class Model(with_metaclass(ModelMeta)):
             cls._options.cache_key_prefix,
             cls._get_table_name(),
             ','.join('{}={}'.format(k, repr(v)) for k, v in sorted(
-                old_kwargs.iteritems()
+                iteritems(old_kwargs)
             )),
             cls._options.cache_key_version
         )

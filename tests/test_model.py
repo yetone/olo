@@ -14,6 +14,7 @@ from olo.errors import (
     ValidationError, ParseError, InvalidFieldError
 )
 from olo.migration import MigrationVersion
+from olo.compat import PY2, basestring, xrange
 from .base import TestCase, BaseModel, Dummy, Bar, db, Ttt, Foo, Lala
 from .utils import auto_use_cache_ctx, patched_execute
 
@@ -203,7 +204,7 @@ class TestModel(TestCase):
         ids = [1, 3, 4]
         dummys = Dummy.gets(ids)
         self.assertEqual(len(dummys), 3)
-        self.assertEqual(map(lambda x: x.id, dummys), ids)
+        self.assertEqual(list(map(lambda x: x.id, dummys)), ids)
         _ids = [1, 300, 4, 100, 2]
         self.assertEqual(len(Dummy.gets(_ids)), 3)
         dummys = Dummy.gets(_ids, filter_none=False)
@@ -227,12 +228,12 @@ class TestModel(TestCase):
             with patched_execute as execute:
                 dummys = Dummy.gets(ids)
                 self.assertEqual(len(dummys), 3)
-                self.assertEqual(map(lambda x: x.id, dummys), ids)
+                self.assertEqual(list(map(lambda x: x.id, dummys)), ids)
                 self.assertTrue(execute.called)
             with patched_execute as execute:
                 dummys = Dummy.gets(ids)
                 self.assertEqual(len(dummys), 3)
-                self.assertEqual(map(lambda x: x.id, dummys), ids)
+                self.assertEqual(list(map(lambda x: x.id, dummys)), ids)
                 self.assertFalse(execute.called)
             with patched_execute as execute:
                 self.assertEqual(len(Bar.gets(['1', '2', '3'])), 3)
@@ -578,13 +579,19 @@ class TestModel(TestCase):
         not_raw = Dummy.query('password').filter(id=dummy.id).one()
         self.assertEqual(not_raw, attrs['password'])
         raw = Dummy.query('password', raw=True).filter(id=dummy.id).one()
-        self.assertEqual(raw, encrypt(attrs['password'], Dummy.AES_KEY))
+        if PY2:
+            self.assertEqual(raw, encrypt(attrs['password'], Dummy.AES_KEY))
+        else:
+            self.assertEqual(raw, str(encrypt(attrs['password'], Dummy.AES_KEY), 'utf8'))
         dummy.update(password='123')
         self.assertEqual(dummy.password, '123')
         dummy = Dummy.get(dummy.id)
         self.assertEqual(dummy.password, '123')
         raw = Dummy.query('password', raw=True).filter(id=dummy.id).one()
-        self.assertEqual(raw, encrypt('123', Dummy.AES_KEY))
+        if PY2:
+            self.assertEqual(raw, encrypt('123', Dummy.AES_KEY))
+        else:
+            self.assertEqual(raw, str(encrypt('123', Dummy.AES_KEY), 'utf8'))
         dummy.password = '456'
         dummy.save()
         dummy = Dummy.get(dummy.id)
@@ -607,23 +614,24 @@ class TestModel(TestCase):
             Dummy.password = old_password
 
     def test_pickle(self):
+        from dill import dumps, loads
         dummy = Dummy.create(**attrs)
-        d = pickle.dumps(dummy, -1)
+        d = dumps(dummy, -1)
         self.assertEqual(dummy.password, pickle.loads(d).password)
         dummy = Dummy.get(dummy.id)
-        d = pickle.dumps(dummy, -1)
+        d = dumps(dummy, -1)
         self.assertEqual(dummy.password, pickle.loads(d).password)
         _dummy = Dummy.cache.get(dummy.id)
         _dummy = Dummy.cache.get(dummy.id)
         self.assertEqual(dummy.password, _dummy.password)
-        pickle.dumps(Dummy.password)
+        dumps(Dummy.password)
         f = Field(
             str,
             input=lambda x: 'encrypted',
             output=lambda x: 'decrypted'
         )
-        pickle.dumps(f)
-        pickle.dumps(Dummy.created_at)
+        dumps(f)
+        dumps(Dummy.created_at)
 
     def test_db_field_v0(self):
         Dummy._options.db_field_version = 0

@@ -8,8 +8,8 @@ import logging
 import unittest
 
 import libmc
-import MySQLdb
 from tests.libs.beansdb import BeansDBProxy
+from olo.compat import PY2
 
 
 in_travis = os.environ.get('ENV') == 'travis'
@@ -21,8 +21,8 @@ BEANSDB_CFG = {
 }
 MYSQL_HOST = 'localhost'
 MYSQL_PORT = 3306
-MYSQL_USER = 'travis' if in_travis else 'root'
-MYSQL_PASSWORD = '' if in_travis else os.getenv('MYSQL_PASSWORD', 'root')
+MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', 'root')
 MYSQL_DB = 'test_olo'
 MYSQL_CHARSET = 'utf8mb4'
 
@@ -52,7 +52,12 @@ def init_tables():
 
 
 def get_mysql_conn():
-    return MySQLdb.connect(
+    try:
+        from pymysql import connect
+    except ImportError:
+        from MySQLdb import connect
+
+    return connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
@@ -86,6 +91,9 @@ def _mc_server_flush_all(host, port):
     sock.connect((host, port))
     req = 'flush_all\r\n'
     expected_res = 'OK\r\n'
+    if not PY2:
+        req = bytes(req, 'utf8')
+        expected_res = bytes(expected_res, 'utf8')
     assert len(req) == sock.send(req)
     assert sock.recv(1024) == expected_res
     sock.close()
@@ -98,7 +106,7 @@ def _flush_mc_server(_mc):
 
     stats = _mc.stats()
     assert len(stats) == 1
-    host, port = stats.keys()[0].split(':')
+    host, port = list(stats.keys())[0].split(':')
     port = int(port)
     _mc_server_flush_all(host, port)
 

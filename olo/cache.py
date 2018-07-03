@@ -3,8 +3,8 @@ import random
 import logging
 
 from functools import wraps
-from itertools import izip
 
+from olo.compat import izip, basestring, iteritems
 from olo.events import after_delete, after_insert, after_update, before_update
 from olo.key import StrKey
 from olo.errors import CacheError
@@ -47,7 +47,7 @@ class CacheWrapper(object):
                 ', '.join(map(friendly_repr, list(args))) if args else '',
                 ', '.join(
                     '{}={}'.format(k, friendly_repr(v))
-                    for k, v in kwargs.iteritems()
+                    for k, v in sorted(iteritems(kwargs))
                 )
             )))
         )
@@ -244,7 +244,7 @@ class CacheWrapper(object):
         if start is None:
             start = 0  # pragma: no cover
         if limit is None:
-            limit = sys.maxint
+            limit = sys.maxsize
 
         over_limit = start + limit > self.MAX_COUNT
 
