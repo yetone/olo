@@ -8,7 +8,7 @@ from olo.local import DbLocal
 from olo.transaction import Transaction
 from olo.logger import logger
 from olo.errors import DataBaseError
-from olo.compat import basestring
+from olo.compat import basestring, unicode
 
 
 def need_beansdb(func):
@@ -32,15 +32,24 @@ def need_beansdb_commit(func):
     return _
 
 
+def sql_literal_factory(db):
+    def literal(v):
+        if isinstance(v, unicode):
+            v = v.encode('utf-8')
+        return db.literal(v)
+    return literal
+
+
 def log_sql(cur, sql, params=None, level=logging.INFO):
     db = cur._get_db()
+    literal = sql_literal_factory(db)
     msg_tpl = '[SQL]: {}'
     if params is None:
         msg = msg_tpl.format(sql)
     else:
         if not isinstance(params, (list, tuple, dict)):
             params = (params,)
-        msg = msg_tpl.format(sql % tuple(map(db.literal, params)))
+        msg = msg_tpl.format(sql % tuple(map(literal, params)))
     logger.log(msg=msg, level=level)
 
 
