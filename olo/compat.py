@@ -1,3 +1,5 @@
+# pylint: disable=undefined-variable,used-before-assignment
+
 try:
     from cdecimal import Decimal
 except ImportError:

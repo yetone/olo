@@ -8,6 +8,7 @@ from olo.local import DbLocal
 from olo.transaction import Transaction
 from olo.logger import logger
 from olo.errors import DataBaseError
+from olo.compat import basestring
 
 
 def need_beansdb(func):

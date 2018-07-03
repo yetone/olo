@@ -8,7 +8,6 @@ import logging
 import unittest
 
 import libmc
-import pymysql
 from tests.libs.beansdb import BeansDBProxy
 from olo.compat import PY2
 
@@ -53,7 +52,12 @@ def init_tables():
 
 
 def get_mysql_conn():
-    return pymysql.connect(
+    try:
+        from pymysql import connect
+    except ImportError:
+        from MySQLdb import connect
+
+    return connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
