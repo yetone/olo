@@ -3,19 +3,19 @@
 import random
 import base64
 from Crypto.Cipher import AES
-from olo.compat import unicode, xrange, basestring
+from olo.compat import PY2, unicode, xrange, basestring
 
 BS = AES.block_size
 
 
 def pad(s):
-    if isinstance(s, bytes):
+    if not PY2 and isinstance(s, bytes):
         s = str(s, 'utf8')
     return s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
 
 
 def unpad(s):
-    if isinstance(s, bytes):
+    if not PY2 and isinstance(s, bytes):
         s = str(s, 'utf8')
     return s[0: -ord(s[-1])]
 
