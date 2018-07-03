@@ -30,10 +30,10 @@ for line in open('requirements.txt', 'r'):
 
 setup(
     name='olo',
-    version='0.0.1',
-    keywords=('ORM', 'olo', 'sqlstore'),
-    description='ORM based on the sqlstore',
-    url='https://github.com/douban/olo',
+    version='0.0.2',
+    keywords=('ORM', 'olo', 'cache', 'sqlstore'),
+    description='ORM with intelligent cache manager',
+    url='https://github.com/yetone/olo',
     license='MIT License',
     author='yetone',
     author_email='guanxipeng@douban.com',
