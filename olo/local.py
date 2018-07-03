@@ -1,6 +1,6 @@
 import threading
-from thread import get_ident
 from collections import deque
+from olo.utils import get_thread_ident
 
 
 class Local(object):
@@ -8,7 +8,7 @@ class Local(object):
 
     def __init__(self):
         object.__setattr__(self, '__storage__', {})
-        object.__setattr__(self, '__ident_func__', get_ident)
+        object.__setattr__(self, '__ident_func__', get_thread_ident)
 
     def __iter__(self):
         return iter(self.__storage__.items())

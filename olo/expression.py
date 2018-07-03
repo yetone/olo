@@ -1,4 +1,5 @@
 from functools import wraps
+from olo.compat import long, basestring
 from olo.interfaces import SQLLiteralInterface
 from olo.mixins.operations import BinaryOperationMixin
 from olo.utils import (

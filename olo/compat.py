@@ -12,15 +12,22 @@ if PY2:
     import __builtin__ as builtins
     import cPickle as pickle
     from cStringIO import StringIO
+    from Queue import Queue, Empty
+
     xrange = xrange
     basestring = basestring
     unicode = unicode
     buffer = buffer
     int_types = (int, long)
     cmp = cmp
+    long = long
+    reduce = reduce
 
     def iteritems(dict):
         return dict.iteritems()  # pragma: no cover
+
+    def iterkeys(dict):
+        return dict.iterkeys()
 
     def itervalues(dict):
         return dict.itervalues()  # pragma: no cover
@@ -35,18 +42,24 @@ else:
     import builtins  # noqa pragma: no cover
     import pickle  # noqa pragma: no cover
     from io import StringIO  # noqa pragma: no cover
+    from queue import Queue, Empty
+    from functools import reduce  # noqa pragma: no cover
 
     izip, imap, xrange = zip, map, range  # pragma: no cover
     basestring = str  # pragma: no cover
     unicode = str  # pragma: no cover
     buffer = bytes  # pragma: no cover
     int_types = (int,)  # pragma: no cover
+    long = int  # pragma: no cover
 
     def cmp(a, b):  # pragma: no cover
         return (a > b) - (a < b)  # pragma: no cover
 
     def iteritems(dict):  # pragma: no cover
         return iter(dict.items())  # pragma: no cover
+
+    def iterkeys(dict):  # pragma: no cover
+        return iter(dict.keys())  # pragma: no cover
 
     def itervalues(dict):  # pragma: no cover
         return iter(dict.values())  # pragma: no cover

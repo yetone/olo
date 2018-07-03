@@ -516,7 +516,7 @@ class TestCache(TestCase):
             bars = Bar.cache.gets_by(xixi='b', age=1,
                                      limit=3, order_by='-name')
             self.assertEqual(len(bars), 3)
-            self.assertEqual(['d', 'c', 'b'], map(lambda x: x.name, bars))
+            self.assertEqual(['d', 'c', 'b'], list(map(lambda x: x.name, bars)))
             self.assertFalse(execute.called)
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1,
@@ -527,7 +527,7 @@ class TestCache(TestCase):
             bars = Bar.cache.gets_by(xixi='b', age=1,
                                      limit=3, order_by='name')
             self.assertEqual(len(bars), 3)
-            self.assertEqual(['a', 'b', 'c'], map(lambda x: x.name, bars))
+            self.assertEqual(['a', 'b', 'c'], list(map(lambda x: x.name, bars)))
             self.assertFalse(execute.called)
 
         with patched_execute as execute:

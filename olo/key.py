@@ -1,6 +1,12 @@
+from olo.compat import PY2
+
+
 class Key(tuple):
     def __init__(self, *args, **kwargs):
-        super(Key, self).__init__(*args, **kwargs)
+        if PY2:
+            super(Key, self).__init__(*args, **kwargs)
+        else:
+            super().__init__()
         self.hashed_value = self.get_hashed_value()
 
     def get_hashed_value(self):

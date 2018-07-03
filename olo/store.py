@@ -2,7 +2,7 @@ import time
 import atexit
 import threading
 
-from Queue import Queue, Empty
+from olo.compat import Queue, Empty, iteritems
 
 
 def is_under_thread():
@@ -42,7 +42,7 @@ class ThreadSafeStore(object):
 
     def clear_cursors(self):
         with self.lock:
-            for k, v in self.cursors.iteritems():
+            for k, v in iteritems(self.cursors):
                 while not v.empty():
                     try:
                         cur = v.get_nowait()

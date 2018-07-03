@@ -8,8 +8,9 @@ import logging
 import unittest
 
 import libmc
-import MySQLdb
+import pymysql
 from tests.libs.beansdb import BeansDBProxy
+from olo.compat import PY2
 
 
 in_travis = os.environ.get('ENV') == 'travis'
@@ -52,7 +53,7 @@ def init_tables():
 
 
 def get_mysql_conn():
-    return MySQLdb.connect(
+    return pymysql.connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
@@ -86,6 +87,9 @@ def _mc_server_flush_all(host, port):
     sock.connect((host, port))
     req = 'flush_all\r\n'
     expected_res = 'OK\r\n'
+    if not PY2:
+        req = bytes(req, 'utf8')
+        expected_res = bytes(expected_res, 'utf8')
     assert len(req) == sock.send(req)
     assert sock.recv(1024) == expected_res
     sock.close()
@@ -98,7 +102,7 @@ def _flush_mc_server(_mc):
 
     stats = _mc.stats()
     assert len(stats) == 1
-    host, port = stats.keys()[0].split(':')
+    host, port = list(stats.keys())[0].split(':')
     port = int(port)
     _mc_server_flush_all(host, port)
 

@@ -25,6 +25,8 @@ class BinaryOperationMixin(object):
     def __div__(self, other):
         return self.BinaryExpression(self, other, '/')
 
+    __truediv__ = __div__
+
     def __mod__(self, other):
         return self.BinaryExpression(self, other, '%')
 

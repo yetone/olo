@@ -41,7 +41,7 @@ class TestHybrid(TestCase):
         q = Foo.query.filter(Foo.new_age > 2)
         sql, params = q.get_sql_and_params()
         self.assertEqual(
-            'SELECT `key`, `age`, `id`, `age_str`, `name` FROM `foo` WHERE `age` - `id` > %s ',  # noqa
+            'SELECT `id`, `name`, `age`, `age_str`, `key` FROM `foo` WHERE `age` - `id` > %s ',  # noqa
             sql
         )
         self.assertEqual(params, [2])

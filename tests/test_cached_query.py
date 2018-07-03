@@ -182,14 +182,14 @@ class TestCachedQuery(TestCase):
                 '-name'
             ).limit(3).all()
             self.assertEqual(len(bars), 3)
-            self.assertEqual(['d', 'c', 'b'], map(lambda x: x.name, bars))
+            self.assertEqual(['d', 'c', 'b'], list(map(lambda x: x.name, bars)))
             self.assertTrue(execute.called)
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
                 '-name'
             ).limit(3).all()
             self.assertEqual(len(bars), 3)
-            self.assertEqual(['d', 'c', 'b'], map(lambda x: x.name, bars))
+            self.assertEqual(['d', 'c', 'b'], list(map(lambda x: x.name, bars)))
             self.assertFalse(execute.called)
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
@@ -202,7 +202,7 @@ class TestCachedQuery(TestCase):
                 'name'
             ).limit(3).all()
             self.assertEqual(len(bars), 3)
-            self.assertEqual(['a', 'b', 'c'], map(lambda x: x.name, bars))
+            self.assertEqual(['a', 'b', 'c'], list(map(lambda x: x.name, bars)))
             self.assertFalse(execute.called)
 
         with patched_execute as execute:
