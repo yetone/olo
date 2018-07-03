@@ -22,8 +22,8 @@ BEANSDB_CFG = {
 }
 MYSQL_HOST = 'localhost'
 MYSQL_PORT = 3306
-MYSQL_USER = 'travis' if in_travis else 'root'
-MYSQL_PASSWORD = '' if in_travis else os.getenv('MYSQL_PASSWORD', 'root')
+MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', 'root')
 MYSQL_DB = 'test_olo'
 MYSQL_CHARSET = 'utf8mb4'
 
