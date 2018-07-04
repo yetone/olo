@@ -1,12 +1,14 @@
 from threading import Timer
+from datetime import date, datetime
 
-from olo.compat import Queue, Empty
+from olo.compat import Queue, Empty, long, unicode, Decimal
 
 from olo.libs.pool import Pool, ConnProxy
 from olo.libs.class_proxy import ClassProxy
 
-from olo.utils import ThreadedObject, parse_execute_sql
+from olo.utils import ThreadedObject, parse_execute_sql, to_camel_case
 from olo.database import BaseDataBase, OLOCursor
+from olo.field import BaseField
 
 
 def get_conn(host, port, user, password, dbname, charset):
@@ -132,6 +134,126 @@ class MySQLDataBase(BaseDataBase):
         conn = self.get_conn()
         cur = conn.cursor()
         return OLOCursor(cur, self)
+
+    @classmethod
+    def to_model_table_schema(cls, model):
+        # pylint: disable=too-many-statements
+
+        field_schemas = []
+        for k in model.__sorted_fields__:
+            f = getattr(model, k)
+
+            f_schema = '`{}`'.format(f.name)
+
+            f_type = ''
+            if f.type in (int, long):
+                if f.length is not None:
+                    if f.length < 2:
+                        f_type = 'TINYINT({})'.format(f.length)  # pragma: no cover
+                    elif f.length < 8:
+                        f_type = 'SMALLINT({})'.format(f.length)
+                    else:
+                        f_type = 'INT({})'.format(f.length)
+                else:
+                    f_type = 'INT'
+            elif f.type in (str, unicode):
+                if f.length is not None:
+                    f_type = 'VARCHAR({})'.format(f.length)
+                else:
+                    f_type = 'TEXT'  # pragma: no cover
+            elif f.type is float:
+                f_type = 'FLOAT'  # pragma: no cover
+            elif f.type is Decimal:
+                f_type = 'DECIMAL'  # pragma: no cover
+            elif f.type is date:
+                f_type = 'DATE'
+            elif f.type is datetime:
+                f_type = 'TIMESTAMP'
+            else:
+                f_type = 'TEXT'
+
+            f_schema += ' ' + f_type
+            if f.character is not None:
+                f_schema += ' CHARACTER SET {}'.format(f.character)  # pragma: no cover
+            if not f.noneable:
+                f_schema += ' NOT NULL'
+
+            if f_type not in (
+                    'BLOB', 'TEXT', 'GEOMETRY', 'JSON'
+            ):
+                if not callable(f.default):
+                    if f.default is not None or f.noneable:
+                        if f.default is not None:
+                            f_schema += ' DEFAULT \'{}\''.format(
+                                f.deparse(f.default)
+                            )
+                        else:
+                            f_schema += ' DEFAULT NULL'
+                elif f.default == datetime.now:
+                    f_schema += ' DEFAULT CURRENT_TIMESTAMP'
+
+            if f.auto_increment:
+                f_schema += ' AUTO_INCREMENT'
+
+            field_schemas.append(f_schema)
+
+        field_schemas.append('PRIMARY KEY ({})'.format(', '.join(
+            '`{}`'.format(x) for x in model.__primary_key__
+        )))
+
+        for key in model.__index_keys__:
+            key_schema = 'INDEX'
+            key_name = 'idx_' + '_'.join(map(to_camel_case, key))
+            key_schema += ' `{}`'.format(key_name)
+            names = []
+            for p in key:
+                f = getattr(model, p)
+                if not isinstance(f, BaseField):
+                    break  # pragma: no cover
+                names.append(f.name)
+            else:
+                if not names:
+                    continue
+                key_schema += ' ({})'.format(
+                    ', '.join('`{}`'.format(x) for x in names)
+                )
+                field_schemas.append(key_schema)
+
+        for key in model.__unique_keys__:
+            key_schema = 'UNIQUE KEY'
+            key_name = 'uk_' + '_'.join(map(to_camel_case, key))
+            key_schema += ' `{}`'.format(key_name)
+            names = []
+            for p in key:
+                f = getattr(model, p)
+                if not isinstance(f, BaseField):
+                    break  # pragma: no cover
+                names.append(f.name)
+            else:
+                if not names:
+                    continue  # pragma: no cover
+                key_schema += ' ({})'.format(
+                    ', '.join('`{}`'.format(x) for x in names)
+                )
+                field_schemas.append(key_schema)
+
+        schema = 'CREATE TABLE IF NOT EXISTS `{}` (\n'.format(
+            model.__table_name__
+        )
+        schema += ',\n'.join('  ' + f for f in field_schemas)
+        schema += '\n)'
+        if model._options.db_engine is not None:
+            schema += ' ENGINE={}'.format(model._options.db_engine)
+        if model._options.db_charset is not None:
+            schema += ' DEFAULT CHARSET={}'.format(model._options.db_charset)
+        return schema + ';'
+
+    def gen_tables_schema(self):
+        schemas = [
+            self.to_model_table_schema(m)
+            for m in self._models
+        ]
+        return '\n\n'.join(schemas)
 
     def sql_execute(self, sql, params=None, **kwargs):  # pylint: disable=W
         cmd = None

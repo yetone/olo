@@ -185,14 +185,14 @@ class TestCase(unittest.TestCase):
         truncate_tables(cur, tables)
 
         # initialize tables data
-        for sqlfile in get_data_files():
-            for sql in get_sqls(open(sqlfile)):
-                try:
-                    cur.execute(sql)
-                except Exception as e:
-                    logger.warn('Error running %s', sqlfile)
-                    logger.warn(e)
-                    raise
+        # for sqlfile in get_data_files():
+        #     for sql in get_sqls(open(sqlfile)):
+        #         try:
+        #             cur.execute(sql)
+        #         except Exception as e:
+        #             logger.warn('Error running %s', sqlfile)
+        #             logger.warn(e)
+        #             raise
 
         cur.connection.commit()
 

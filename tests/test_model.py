@@ -15,7 +15,7 @@ from olo.errors import (
 )
 from olo.migration import MigrationVersion
 from olo.compat import PY2, basestring, xrange, to_str
-from .base import TestCase, BaseModel, Dummy, Bar, db, Ttt, Foo, Lala
+from .base import db, TestCase, BaseModel, Dummy, Bar, db, Ttt, Foo, Lala
 from .utils import auto_use_cache_ctx, patched_execute
 
 
@@ -40,6 +40,9 @@ class _Dummy(Dummy):
     def validate_name(cls, name):
         if name > 1000:
             raise ValidationError('%s more than 1000' % name)
+
+
+db.create_all()
 
 
 class TestModel(TestCase):

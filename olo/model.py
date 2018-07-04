@@ -80,6 +80,8 @@ class ModelOptions(object):
                  cache_class=CacheWrapper,
                  auto_use_cache=False,
                  report=None,
+                 db_engine=None,
+                 db_charset=None,
                  **kwargs):
         assert db_field_version in (0, 1)
         if db:
@@ -95,6 +97,8 @@ class ModelOptions(object):
         self.cached_query_class = cached_query_class
         self.cache_class = cache_class
         self.auto_use_cache = auto_use_cache
+        self.db_engine = db_engine
+        self.db_charset = db_charset
         self._report = report
         self.update(**kwargs)
 
@@ -268,7 +272,7 @@ def _collect_fields(cls, attrs):
     field_name_map = {}
     encrypted_fields = {}
 
-    for k in dir(cls):
+    for k in dir(cls) if not cls.__abstract__ else []:
         v = getattr(cls, k)
         if isinstance(v, BaseField):
             if k not in attrs:
@@ -369,11 +373,16 @@ class ModelMeta(type):
 
         attrs['Options'] = type('Options', (), options)
         attrs['_options'] = ModelOptions(**options)
+        if '__abstract__' not in attrs:
+            attrs['__abstract__'] = False
 
         return super(ModelMeta, mcs).__new__(mcs, class_name, bases, attrs)
 
     def __init__(cls, class_name, bases, attrs):
         super(ModelMeta, cls).__init__(class_name, bases, attrs)
+
+        if cls.__abstract__:
+            return
 
         (
             fields,
@@ -476,6 +485,9 @@ class ModelMeta(type):
 
         cls.__ctx__ = Context()
 
+        if cls._options.db is not None:
+            cls._options.db.register_model(cls)
+
     @readonly_cached_property
     def cq(cls):
         return cls._options.cached_query_class(cls)
@@ -514,6 +526,8 @@ def final_methods(cls):
 class Model(with_metaclass(ModelMeta)):
 
     AES_KEY = '*' * 32
+
+    __abstract__ = True
 
     _olo_is_new = True
     _olo_qs = None

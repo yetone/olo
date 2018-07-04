@@ -19,6 +19,11 @@ def camel2underscore(name):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
+def to_camel_case(snake_str):
+    pieces = snake_str.split('_')
+    return pieces[0] + ''.join(x.title() for x in pieces[1:])
+
+
 class Missing(object):
 
     def __eq__(self, other):

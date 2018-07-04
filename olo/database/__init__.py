@@ -93,6 +93,15 @@ class OLOCursor(object):
         return self.cur._get_db()
 
 
+def get_sqls(lines):
+    sql = ''
+    for line in lines:
+        sql += line
+        if line.rstrip().endswith(';'):
+            yield sql
+            sql = ''
+
+
 class BaseDataBase(object):
 
     def __init__(self, beansdb=None, autocommit=True,
@@ -103,6 +112,7 @@ class BaseDataBase(object):
         self._tables = None
         self._index_rows_mapping = {}
         self.enable_log = False
+        self._models = []
 
     def add_lazy_func(self, func):
         self._local.add_lazy_func(func)
@@ -176,6 +186,18 @@ class BaseDataBase(object):
 
     def get_cursor(self):
         raise NotImplementedError
+
+    def gen_tables_schema(self):
+        raise NotImplementedError
+
+    def create_all(self):
+        schema = self.gen_tables_schema()
+        with self.transaction():
+            for sql in get_sqls(schema.split('\n')):
+                self.sql_execute(sql)
+
+    def register_model(self, model_cls):
+        self._models.append(model_cls)
 
     def log(self, sql, params=None, level=logging.INFO):
         if not self.enable_log:
@@ -332,6 +354,9 @@ class DataBase(BaseDataBase):
         if cur is None:  # pragma: no cover
             return cur  # pragma: no cover
         return OLOCursor(cur, self)  # pragma: no cover
+
+    def gen_tables_schema(self):
+        raise NotImplementedError("not implement gen_tables_schema!")
 
     def sql_execute(self, sql, params=None):
         return self.store.execute(sql, params)
