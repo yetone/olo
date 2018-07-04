@@ -306,7 +306,7 @@ class CacheWrapper(object):
 
         insts = filter(lambda inst: isinstance(inst, self._model_class), insts)
         if not insts:
-            return
+            return  # pragma: no cover
 
         def _cbk():
             for inst in insts:

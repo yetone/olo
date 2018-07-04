@@ -1,12 +1,16 @@
 language: python
+
 python:
   - "2.7"
   - "3.6"
+
 env:
   - MYSQL_USER=travis MYSQL_PASSWORD=
+
 services:
   - mysql
   - memcached
+
 before_script:
   - mysql -e 'drop database if exists test_olo'
   - mysql -e 'create database test_olo'
@@ -14,6 +18,10 @@ before_script:
   - pip install -r requirements.txt
   - pip install -r test-requirements.txt
   - pip install pylint
+
 script:
-  - pytest
+  - pytest --cov=olo
   - pylint --rcfile=pylintrc olo
+
+after_success:
+  - codecov

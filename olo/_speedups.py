@@ -8,7 +8,7 @@ def parse_attrs(cls, attrs, decrypt=True, output=True):
     res = {}
     for k, v in iteritems(attrs):
         if isinstance(v, Missing):
-            continue
+            continue  # pragma: no cover
         # TODO
         if isinstance(v, Expression):
             continue
@@ -39,6 +39,6 @@ def decrypt_attrs(cls, attrs):
     res = dict(attrs)
     for name, field in iteritems(cls.__encrypted_fields__):
         if name not in res:
-            continue
+            continue  # pragma: no cover
         res[name] = field.decrypt_func(res[name])
     return res

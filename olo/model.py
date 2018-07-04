@@ -616,7 +616,7 @@ class Model(with_metaclass(ModelMeta)):
                 attrs, decrypt=decrypt, output=output
             )
         else:
-            parsed_attrs = attrs
+            parsed_attrs = attrs  # pragma: no cover
         self._check_choices(parsed_attrs)
         self._check_validates(parsed_attrs)
         return parsed_attrs
@@ -846,7 +846,7 @@ class Model(with_metaclass(ModelMeta)):
     @classmethod
     def _olo_get_db_field(cls, attr_name):
         if attr_name not in cls.__db_fields__:
-            return
+            return  # pragma: no cover
         return getattr(cls, attr_name)
 
     @classmethod
@@ -1049,7 +1049,7 @@ class Model(with_metaclass(ModelMeta)):
             **pk_dict
         ).first()
         if len(missing_fields) == 1 and values is not None and not isinstance(values, list):
-            values = [values]
+            values = [values]  # pragma: no cover
         if values:
             self._data.update(
                 dict(izip(map(lambda f: f.attr_name, missing_fields), values))
