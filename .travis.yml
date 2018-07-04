@@ -18,6 +18,7 @@ before_script:
   - pip install -r requirements.txt
   - pip install -r test-requirements.txt
   - pip install pylint
+  - pip install codecov
 
 script:
   - pylint --rcfile=pylintrc olo
