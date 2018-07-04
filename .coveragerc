@@ -1,5 +1,5 @@
 [run]
-omit = olo/libs/*,olo/local.py,olo/store.py
+omit = olo/libs/*,olo/local.py,olo/store.py,olo/compat.py
 
 [report]
 exclude_lines =

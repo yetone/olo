@@ -4,9 +4,9 @@ from olo.compat import PY2
 class Key(tuple):
     def __init__(self, *args, **kwargs):
         if PY2:
-            super(Key, self).__init__(*args, **kwargs)
+            super(Key, self).__init__(*args, **kwargs)  # pragma: no cover
         else:
-            super().__init__()  # pylint: disable=missing-super-argument
+            super().__init__()  # pylint: disable=missing-super-argument pragma: no cover
         self.hashed_value = self.get_hashed_value()
 
     def get_hashed_value(self):

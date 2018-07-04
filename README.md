@@ -5,6 +5,12 @@
 # 
 
 <p align="center">
+    <a href="https://www.python.org">
+        <img alt="Support Python Version" src="https://img.shields.io/badge/Python-2.7-brightgreen.svg">
+    </a>
+    <a href="https://www.python.org">
+        <img alt="Support Python Version" src="https://img.shields.io/badge/Python-3.6-brightgreen.svg">
+    </a>
     <a href="https://travis-ci.org/yetone/olo">
         <img alt="Build Status" src="https://travis-ci.org/yetone/olo.svg?branch=master">
     </a>

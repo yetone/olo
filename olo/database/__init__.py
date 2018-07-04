@@ -61,17 +61,25 @@ class OLOCursor(object):
     def __getattr__(self, name):
         return getattr(self.cur, name)
 
+    @property
+    def is_modified(self):
+        return self.cur.is_modified  # pragma: no cover
+
+    @is_modified.setter
+    def is_modified(self, item):
+        self.cur.is_modified = item
+
     def __iter__(self):
         return iter(self.cur)
 
     def __str__(self):
-        return '<OLOCursor: {}>'.format(self.cur)
+        return '<OLOCursor: {}>'.format(self.cur)  # pragma: no cover
 
     __repr__ = __str__
 
     def execute(self, sql, *args, **kwargs):
         if isinstance(self.db, DataBase):
-            kwargs['called_from_store'] = kwargs.pop('called_from_store', True)
+            kwargs['called_from_store'] = kwargs.pop('called_from_store', True)  # pragma: no cover
         r = self.cur.execute(sql, *args, **kwargs)
         params = args[0] if args else None
         if self.db.enable_log:
@@ -79,7 +87,7 @@ class OLOCursor(object):
         return r
 
     def close(self):
-        return self.cur.close()
+        return self.cur.close()  # pragma: no cover
 
     def _get_db(self):
         return self.cur._get_db()
@@ -320,10 +328,10 @@ class DataBase(BaseDataBase):
         return self._store
 
     def get_cursor(self):
-        cur = self.store.get_cursor()
-        if cur is None:
-            return cur
-        return OLOCursor(cur, self)
+        cur = self.store.get_cursor()  # pragma: no cover
+        if cur is None:  # pragma: no cover
+            return cur  # pragma: no cover
+        return OLOCursor(cur, self)  # pragma: no cover
 
     def sql_execute(self, sql, params=None):
         return self.store.execute(sql, params)

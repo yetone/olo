@@ -281,7 +281,7 @@ def _get_db_field_version(field, obj):
 
 def _prefetch_db_data(obj):
     if not obj:
-        return
+        return  # pragma: no cover
     session = getattr(obj, '_olo_qs', None)
     if session is None:
         return
@@ -320,7 +320,7 @@ def _get_db_values(pairs):
         assert obj is not None
         assert field is not None
         if isinstance(version, MigrationVersion):
-            continue
+            continue  # pragma: no cover
         version_groups[version].append((obj, field))
     if not version_groups:
         return
@@ -332,18 +332,18 @@ def _get_db_values(pairs):
             elif version == 1:
                 key = field._get_db_field_key(obj)
             else:
-                continue
+                continue  # pragma: no cover
             mapping[(obj._olo_get_signature(), field.name, version)] = key
     keys = list(set(mapping.values()))
     if not keys:
-        return
+        return  # pragma: no cover
     db = obj._get_db()
     values = db.db_get_multi(keys)
     res = []
     for obj, field, version in pairs:
         key = mapping.get((obj._olo_get_signature(), field.name, version))
         if not key:
-            value = missing
+            value = missing  # pragma: no cover
         else:
             value = values.get(key, missing)
         res.append(value)
