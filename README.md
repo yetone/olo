@@ -14,6 +14,9 @@
     <a href="https://travis-ci.org/yetone/olo">
         <img alt="Build Status" src="https://travis-ci.org/yetone/olo.svg?branch=master">
     </a>
+    <a href="https://codecov.io/gh/yetone/olo">
+        <img src="https://codecov.io/gh/yetone/olo/branch/master/graph/badge.svg" />
+    </a>
 </p>
 
 <p align="center">
