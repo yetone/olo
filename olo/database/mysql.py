@@ -137,7 +137,7 @@ class MySQLDataBase(BaseDataBase):
         cmd = None
         try:
             cmd, _ = parse_execute_sql(sql)
-        except Exception:  # pylint: disable=W pragma: no cover
+        except Exception:  # pragma: no cover pylint: disable=W
             pass  # pragma: no cover
         cur = self.get_cursor()
         res = cur.execute(sql, params, **kwargs)
@@ -160,13 +160,13 @@ class MySQLDataBase(BaseDataBase):
                 try:
                     cur.conn.commit()
                     cur.is_modified = False
-                except Exception as e:  # pylint: disable=W pragma: no cover
+                except Exception as e:  # pragma: no cover pylint: disable=W
                     if first_err is None:  # pragma: no cover
                         first_err = e  # pragma: no cover
             except Empty:  # pragma: no cover
                 pass  # pragma: no cover
         if first_err is not None:
-            raise first_err  # pylint: disable=E pragma: no cover
+            raise first_err  # pragma: no cover pylint: disable=E
 
     def sql_rollback(self):
         first_err = None
@@ -176,10 +176,10 @@ class MySQLDataBase(BaseDataBase):
                 try:
                     cur.conn.rollback()
                     cur.is_modified = False
-                except Exception as e:  # pylint: disable=W pragma: no cover
+                except Exception as e:  # pragma: no cover pylint: disable=W
                     if first_err is None:  # pragma: no cover
                         first_err = e  # pragma: no cover
             except Empty:  # pragma: no cover
                 pass  # pragma: no cover
         if first_err is not None:
-            raise first_err  # pylint: disable=E pragma: no cover
+            raise first_err  # pragma: no cover pylint: disable=E

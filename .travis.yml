@@ -20,8 +20,8 @@ before_script:
   - pip install pylint
 
 script:
-  - pytest --cov=olo
   - pylint --rcfile=pylintrc olo
+  - pytest --cov=olo
 
 after_success:
   - codecov
