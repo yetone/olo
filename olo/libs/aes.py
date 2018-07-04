@@ -3,20 +3,18 @@
 import random
 import base64
 from Crypto.Cipher import AES
-from olo.compat import PY2, unicode, xrange, basestring
+from olo.compat import basestring, to_str, unicode, xrange
 
 BS = AES.block_size
 
 
 def pad(s):
-    if not PY2 and isinstance(s, bytes):
-        s = str(s, 'utf8')
+    s = to_str(s)
     return s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
 
 
 def unpad(s):
-    if not PY2 and isinstance(s, bytes):
-        s = str(s, 'utf8')
+    s = to_str(s)
     return s[0: -ord(s[-1])]
 
 
@@ -24,10 +22,7 @@ def encrypt(plain_text, key):
     cipher = AES.new(key)
     if not isinstance(plain_text, (basestring, int)):
         return plain_text
-    if isinstance(plain_text, unicode):
-        plain_text = plain_text.encode('utf-8')
-    else:
-        plain_text = str(plain_text)
+    plain_text = to_str(plain_text)
     encrypted = cipher.encrypt(pad(plain_text))
     return base64.b64encode(encrypted)
 

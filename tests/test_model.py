@@ -14,7 +14,7 @@ from olo.errors import (
     ValidationError, ParseError, InvalidFieldError
 )
 from olo.migration import MigrationVersion
-from olo.compat import PY2, basestring, xrange
+from olo.compat import PY2, basestring, xrange, to_str
 from .base import TestCase, BaseModel, Dummy, Bar, db, Ttt, Foo, Lala
 from .utils import auto_use_cache_ctx, patched_execute
 
@@ -579,19 +579,13 @@ class TestModel(TestCase):
         not_raw = Dummy.query('password').filter(id=dummy.id).one()
         self.assertEqual(not_raw, attrs['password'])
         raw = Dummy.query('password', raw=True).filter(id=dummy.id).one()
-        if PY2:
-            self.assertEqual(raw, encrypt(attrs['password'], Dummy.AES_KEY))
-        else:
-            self.assertEqual(raw, str(encrypt(attrs['password'], Dummy.AES_KEY), 'utf8'))
+        self.assertEqual(raw, to_str(encrypt(attrs['password'], Dummy.AES_KEY)))
         dummy.update(password='123')
         self.assertEqual(dummy.password, '123')
         dummy = Dummy.get(dummy.id)
         self.assertEqual(dummy.password, '123')
         raw = Dummy.query('password', raw=True).filter(id=dummy.id).one()
-        if PY2:
-            self.assertEqual(raw, encrypt('123', Dummy.AES_KEY))
-        else:
-            self.assertEqual(raw, str(encrypt('123', Dummy.AES_KEY), 'utf8'))
+        self.assertEqual(raw, to_str(encrypt('123', Dummy.AES_KEY)))
         dummy.password = '456'
         dummy.save()
         dummy = Dummy.get(dummy.id)
