@@ -32,7 +32,7 @@ class BaseField(object):
                  noneable=False, attr_name=None,
                  version=None, length=None,
                  auto_increment=False,
-                 character=None):
+                 charset=None):
 
         if default is not None and noneable:
             noneable = False
@@ -63,7 +63,7 @@ class BaseField(object):
         self.version = version
         self.length = length
         self.auto_increment = auto_increment
-        self.character = character
+        self.charset = charset
         self._alias_name = None
         self._model_ref = lambda: None
 
