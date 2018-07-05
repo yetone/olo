@@ -1,38 +1,32 @@
-import re
 import inspect
-import weakref
+import operator
+import re
 import threading
+import weakref
 from copy import copy
+from datetime import date, datetime
 from functools import wraps
-from datetime import datetime, date
 from itertools import chain, product
 
-from olo.utils import (
-    camel2underscore, deprecation, type_checker, missing,
-    cached_property, override, sql_and_params, get_sql_pieces_and_params,
-    friendly_repr, readonly_cached_property,
-)
-
-from olo.expression import Expression, BinaryExpression
-from olo.field import Field, UnionField, DbField, BaseField
-from olo.errors import (
-    ExpressionError, DeparseError, InvalidFieldError
-)
-from olo.query import Query
-from olo.cached_query import CachedQuery
+from olo._speedups import decrypt_attrs, parse_attrs
 from olo.cache import CacheWrapper, delete_cache
-from olo.events import after_update, after_delete, after_insert, before_update
+from olo.cached_query import CachedQuery
+from olo.compat import (basestring, iteritems, iterkeys, itervalues, izip,
+                        long, reduce, values_list, with_metaclass, xrange)
 from olo.context import Context, context, model_instantiate_context
-from olo.key import StrKey
-from olo.funcs import RAND
-from olo._speedups import parse_attrs, decrypt_attrs
+from olo.errors import DeparseError, ExpressionError, InvalidFieldError
+from olo.events import after_delete, after_insert, after_update, before_update
+from olo.expression import BinaryExpression, Expression
 from olo.ext.exported import IS_EXPORTED_PROPERTY
 from olo.ext.n import N
-from olo.compat import (
-    with_metaclass, xrange, long, basestring, izip,
-    iteritems, iterkeys, itervalues, values_list,
-)
-
+from olo.field import BaseField, DbField, Field, UnionField
+from olo.funcs import RAND
+from olo.key import StrKey
+from olo.query import Query
+from olo.utils import (cached_property, camel2underscore, deprecation,
+                       friendly_repr, get_sql_pieces_and_params, missing,
+                       override, readonly_cached_property, sql_and_params,
+                       type_checker)
 
 VALID_TYPES = (basestring, int, float, long, date)
 PATTERN_N_NAME = re.compile('s$')
@@ -1314,6 +1308,7 @@ class Model(with_metaclass(ModelMeta)):
         )
         if suffix:
             key += ':suffix:%s' % suffix
+        # avoid mc bug
         return key.replace(' ', '&nbsp;')
 
     @property
@@ -1325,18 +1320,13 @@ class Model(with_metaclass(ModelMeta)):
         elif self.__unique_keys__:  # pragma: no cover
             keys = self.__unique_keys__[0]  # pragma: no cover
 
-        expression = None
-        for attr_name in keys:
-            _expression = (
-                getattr(self.__class__, attr_name) == getattr(self, attr_name)
-            )
-            if expression is None:
-                expression = _expression
-            else:
-                expression &= _expression  # pragma: no cover
-
-        if expression is None:
+        if not keys:
             return '', []  # pragma: no cover
+
+        expression = reduce(
+            operator.and_,
+            map(lambda k: getattr(self.__class__, k) == getattr(self, k), keys)
+        )
 
         return sql_and_params(expression)
 
