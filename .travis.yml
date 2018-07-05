@@ -12,6 +12,7 @@ services:
   - memcached
 
 before_script:
+  - mysql -e 'set global innodb_large_prefix=1'
   - mysql -e 'drop database if exists test_olo'
   - mysql -e 'create database test_olo'
   - mysql -e 'grant all on *.* to travis@localhost'
