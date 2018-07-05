@@ -242,10 +242,12 @@ class MySQLDataBase(BaseDataBase):
         )
         schema += ',\n'.join('  ' + f for f in field_schemas)
         schema += '\n)'
-        if model._options.db_engine is not None:
-            schema += ' ENGINE={}'.format(model._options.db_engine)
-        if model._options.db_charset is not None:
-            schema += ' DEFAULT CHARSET={}'.format(model._options.db_charset)
+        if model._options.table_engine is not None:
+            schema += ' ENGINE={}'.format(model._options.table_engine)
+        if model._options.table_charset is not None:
+            schema += ' DEFAULT CHARSET={}'.format(
+                model._options.table_charset
+            )
         return schema + ';'
 
     def gen_tables_schema(self):

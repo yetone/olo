@@ -32,8 +32,8 @@ class _BaseModel(Model):
         db = db
         cache_client = mc
         enable_log = True
-        db_engine = 'InnoDB'
-        db_charset = 'utf8mb4'
+        table_engine = 'InnoDB'
+        table_charset = 'utf8mb4'
 
 
 class BaseModel(_BaseModel):

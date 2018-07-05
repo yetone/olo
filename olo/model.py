@@ -80,8 +80,8 @@ class ModelOptions(object):
                  cache_class=CacheWrapper,
                  auto_use_cache=False,
                  report=None,
-                 db_engine=None,
-                 db_charset=None,
+                 table_engine=None,
+                 table_charset=None,
                  **kwargs):
         assert db_field_version in (0, 1)
         if db:
@@ -97,8 +97,8 @@ class ModelOptions(object):
         self.cached_query_class = cached_query_class
         self.cache_class = cache_class
         self.auto_use_cache = auto_use_cache
-        self.db_engine = db_engine
-        self.db_charset = db_charset
+        self.table_engine = table_engine
+        self.table_charset = table_charset
         self._report = report
         self.update(**kwargs)
 
