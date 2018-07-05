@@ -17,6 +17,9 @@
     <a href="https://codecov.io/gh/yetone/olo">
         <img src="https://codecov.io/gh/yetone/olo/branch/master/graph/badge.svg" />
     </a>
+    <a href="https://pypi.org/project/olo/">
+        <img src="https://img.shields.io/pypi/v/olo.svg" />
+    </a>
 </p>
 
 <p align="center">
