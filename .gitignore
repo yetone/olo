@@ -67,3 +67,4 @@ test-reports
 *.so
 
 /active_stubs/
+venv

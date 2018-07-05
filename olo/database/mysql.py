@@ -173,8 +173,8 @@ class MySQLDataBase(BaseDataBase):
                 f_type = 'TEXT'
 
             f_schema += ' ' + f_type
-            if f.character is not None:
-                f_schema += ' CHARACTER SET {}'.format(f.character)  # pragma: no cover
+            if f.charset is not None:
+                f_schema += ' CHARACTER SET {}'.format(f.charset)
             if not f.noneable:
                 f_schema += ' NOT NULL'
 

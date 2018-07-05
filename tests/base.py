@@ -33,7 +33,7 @@ class _BaseModel(Model):
         cache_client = mc
         enable_log = True
         table_engine = 'InnoDB'
-        table_charset = 'utf8mb4'
+        table_charset = 'latin1'
 
 
 class BaseModel(_BaseModel):
@@ -52,8 +52,10 @@ class BaseModel(_BaseModel):
 
 class Dummy(BaseModel):
     id = Field(int, primary_key=True, length=11, auto_increment=True)
-    name = Field(str, noneable=True, default='dummy', length=255)
-    age = Field(int, default=12, on_update=lambda x: x.__class__.age + 1, length=11)
+    name = Field(str, noneable=True, default='dummy', length=255,
+                 charset='utf8mb4')
+    age = Field(int, default=12, on_update=lambda x: x.__class__.age + 1,
+                length=11)
     password = Field(str, noneable=True, encrypt=True, length=511)
     flag = Field(int, noneable=True, choices=[0, 1, 2], length=5)
     tags = Field([str], default=[])
