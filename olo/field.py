@@ -30,7 +30,9 @@ class BaseField(object):
                  choices=None, encrypt=False,
                  input=None, output=None,
                  noneable=False, attr_name=None,
-                 version=None):
+                 version=None, length=None,
+                 auto_increment=False,
+                 character=None):
 
         if default is not None and noneable:
             noneable = False
@@ -59,6 +61,9 @@ class BaseField(object):
         self.noneable = noneable
         self.attr_name = attr_name or name
         self.version = version
+        self.length = length
+        self.auto_increment = auto_increment
+        self.character = character
         self._alias_name = None
         self._model_ref = lambda: None
 
