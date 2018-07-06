@@ -407,3 +407,11 @@ def optimize_sexp(sexp):
 
 def optimize_sql_ast(sql_ast):
     return [optimize_sexp(sexp) for sexp in sql_ast]
+
+
+def is_sql_ast(lst):
+    if not isinstance(lst, list) or not lst:
+        return False
+    if not isinstance(lst[0], str_types):
+        return False
+    return lst[0].upper() == lst[0]

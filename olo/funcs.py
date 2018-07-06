@@ -147,8 +147,8 @@ class COUNT(Function):
                     self.args[0], BinaryExpression
             ):
                 ifexp = IF(self.args[0]).THEN(1).ELSE(None)
-                _str, params = ifexp.get_sql_and_params()
-                return ['CALL', 'COUNT', _str]
+                sql_ast = ifexp.get_sql_ast()
+                return ['CALL', 'COUNT', sql_ast]
         return super(COUNT, self)._get_sql_ast()
 
     def _get_sql_and_params(self):

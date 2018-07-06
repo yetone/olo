@@ -258,11 +258,12 @@ class Query(SQLLiteralInterface, SQLASTInterface):
         return COUNT(self).first()  # pylint: disable=E1101
 
     def count_and_all(self):
-        base_sql, base_params = self._get_base_sql_and_params(
-            modifiers='SQL_CALC_FOUND_ROWS'
+        base_sql_ast, alias_mapping = self._get_base_sql_ast(
+            modifier='SQL_CALC_FOUND_ROWS'
         )
         cursor = self.db.get_cursor()
-        rv = self._get_rv(base_sql=base_sql, base_params=base_params,
+        rv = self._get_rv(base_sql_ast=base_sql_ast,
+                          alias_mapping=alias_mapping,
                           cursor=cursor)
         cursor.execute('SELECT FOUND_ROWS()')
         count = cursor.fetchone()[0]
@@ -278,13 +279,13 @@ class Query(SQLLiteralInterface, SQLASTInterface):
                                   'without expression')
         expressions, _, _ = self._model_class._split_attrs(values)
 
-        sql_pieces, params = get_sql_pieces_and_params(expressions)
-
-        sql = 'UPDATE `{table}` SET {columns} '.format(
-            table=self.table_name,
-            columns=', '.join(sql_pieces),
-        )
-        rows = self._get_rv(base_sql=sql, base_params=params)
+        sql_ast = [
+            'UPDATE',
+            ['TABLE', self.table_name],
+            ['SET',
+             ['SERIES'] + [exp.get_sql_ast() for exp in expressions]]
+        ]
+        rows = self._get_rv(base_sql_ast=sql_ast)
         if self.db.autocommit:
             self.db.commit()
         return rows
@@ -294,10 +295,11 @@ class Query(SQLLiteralInterface, SQLASTInterface):
         if not expression:
             raise ExpressionError('Cannot execute delete because of '
                                   'without expression')
-        sql = 'DELETE FROM `{table}` '.format(
-            table=self.table_name,
-        )
-        rows = self._get_rv(base_sql=sql)
+        sql_ast = [
+            'DELETE',
+            ['TABLE', self.table_name]
+        ]
+        rows = self._get_rv(base_sql_ast=sql_ast)
         if self.db.autocommit:
             self.db.commit()
         return rows
@@ -306,19 +308,24 @@ class Query(SQLLiteralInterface, SQLASTInterface):
     def table_name(self):
         return self._model_class._get_table_name()
 
-    def _get_rv(self, base_sql=None, base_params=None,
+    def _get_rv(self, base_sql_ast=None,
+                alias_mapping=None,
                 cursor=None):
         return self.__get_rv(
-            base_sql=base_sql,
-            base_params=base_params,
+            base_sql_ast=base_sql_ast,
+            alias_mapping=alias_mapping,
             cursor=cursor,
         )
 
-    def __get_rv(self, base_sql=None, base_params=None,
+    def __get_rv(self, base_sql_ast=None,
+                 alias_mapping=None,
                  cursor=None):
-        sql, params = self.get_sql_and_params(
-            base_sql=base_sql, base_params=base_params
+        sql_ast = self.get_sql_ast(
+            base_sql_ast=base_sql_ast,
+            alias_mapping=alias_mapping,
         )
+
+        sql, params = self.db.ast_translator.translate(sql_ast)
 
         if cursor is not None:
             cursor.execute(sql, params)
@@ -355,7 +362,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
             fields = self._get_fields(self._group_by)
             sql_ast.append([
                 'GROUP BY',
-                ['AND'] + [f.get_sql_ast() for f in fields]
+                ['SERIES'] + [f.get_sql_ast() for f in fields]
             ])
 
         if self._having_expressions:
@@ -368,13 +375,13 @@ class Query(SQLLiteralInterface, SQLASTInterface):
             fields = self._get_fields(self._order_by)
             sql_ast.append([
                 'ORDER BY',
-                ['QUOTE'] + [f.get_sql_ast() for f in fields]
+                ['SERIES'] + [f.get_sql_ast() for f in fields]
             ])
 
         if self._limit is not None:
-            limit_section = ['LIMIT', 0, ['VALUE', self._limit]]
+            limit_section = ['LIMIT', None, ['VALUE', self._limit]]
 
-            if self._offset is not None:
+            if self._offset is not None and self._offset != 0:
                 limit_section[1] = ['VALUE', self._offset]
 
             sql_ast.append(limit_section)
@@ -492,7 +499,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
             table_section = [
                 'RIGHT JOIN',
                 ['TABLE', self.table_name],
-                ['TABLE', self._left_join._get_table_name()]
+                ['TABLE', self._right_join._get_table_name()]
             ]
         else:
             table_section = ['TABLE', self.table_name]
@@ -507,9 +514,10 @@ class Query(SQLLiteralInterface, SQLASTInterface):
 
         with alias_mapping_context(alias_mapping):
             select_ast = [
-                'QUOTE',
-            ] + [e.get_sql_ast() for e in entities]
-            if len(select_ast) == 2 and select_ast[1][0] == 'QUOTE':
+                'SERIES',
+            ] + [e.get_sql_ast() if hasattr(e, 'get_sql_ast') else e
+                 for e in entities]
+            if len(select_ast) == 2 and select_ast[1][0] == 'SERIES':
                 select_ast = select_ast[1]
             if modifier is not None:
                 select_ast = ['MODIFIER', modifier, select_ast]

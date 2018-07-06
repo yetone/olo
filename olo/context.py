@@ -52,6 +52,16 @@ def field_verbose_context():
 
 
 @contextmanager
+def alias_only_context(alias_only=True):
+    _alias_only = context.alias_only
+    try:
+        context.alias_only = alias_only
+        yield
+    finally:
+        context.alias_only = _alias_only
+
+
+@contextmanager
 def model_instantiate_context(ctx):
     _ctx = ctx.in_model_instantiate
     _depth = ctx.instantiate_depth or 0

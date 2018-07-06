@@ -9,6 +9,7 @@ from olo.transaction import Transaction
 from olo.logger import logger
 from olo.errors import DataBaseError
 from olo.compat import str_types, unicode
+from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator
 
 
 def need_beansdb(func):
@@ -103,6 +104,8 @@ def get_sqls(lines):
 
 
 class BaseDataBase(object):
+
+    ast_translator = MySQLSQLASTTranslator()
 
     def __init__(self, beansdb=None, autocommit=True,
                  report=lambda *args, **kwargs: None):

@@ -701,24 +701,21 @@ class Model(with_metaclass(ModelMeta)):
             return False
 
         if expressions:
-            expression, _params = self.unique_expression_and_params
-            if not _params:
+            expression = self.unique_expression
+            if expression is None:
                 raise ExpressionError('Cannot update this instance because of '  # noqa pragma: no cover
                                       'the model has no primary_key '
                                       'and unique_key')
 
-            sql_pieces, params = get_sql_pieces_and_params(expressions)
-            if _params:
-                params.extend(_params)
+            sql_ast = [
+                'UPDATE',
+                ['TABLE', self._get_table_name()],
+                ['SET',
+                 ['SERIES'] + [exp.get_sql_ast() for exp in expressions]],
+                ['WHERE'] + [expression.get_sql_ast()]
+            ]
 
-            sql = (
-                'UPDATE `{table_name}` SET {columns} '
-                'WHERE {expression} '
-            ).format(
-                table_name=self._get_table_name(),
-                columns=', '.join(sql_pieces),
-                expression=expression
-            )
+            sql, params = db.ast_translator.translate(sql_ast)
 
             try:
                 db.execute(sql, params)
@@ -785,21 +782,20 @@ class Model(with_metaclass(ModelMeta)):
     def delete(self, **kwargs):
         if self.before_delete(**kwargs) is False:
             return
-        expression, params = self.unique_expression_and_params
-        if not params:
+        expression = self.unique_expression
+        if expression is None:
             raise ExpressionError('Cannot delete this instance because of '  # noqa pragma: no cover
                                   'the model has no primary_key '
                                   'and unique_key')
 
-        sql = (
-            'DELETE FROM `{table_name}` '
-            'WHERE {expression} '
-        ).format(
-            table_name=self._get_table_name(),
-            expression=expression
-        )
+        sql_ast = [
+            'DELETE',
+            ['TABLE', self._get_table_name()],
+            ['WHERE'] + [expression.get_sql_ast()]
+        ]
 
         db = self._get_db()
+        sql, params = db.ast_translator.translate(sql_ast)
         db.execute(sql, params)
 
         def func():
@@ -952,14 +948,21 @@ class Model(with_metaclass(ModelMeta)):
                 if _params:
                     params.extend(_params)
 
-            sql = (
-                'INSERT INTO `{table_name}`({columns}) '
-                'VALUES({values}) '
-            ).format(
-                table_name=self._get_table_name(),
-                columns=', '.join(sql_pieces),
-                values=', '.join(['%s'] * len(params))
-            )
+            fields_ast = ['BRACKET']
+            values_ast = ['VALUES']
+
+            for exp in expressions:
+                fields_ast.append(exp.left.get_sql_ast())
+                values_ast.append(['VALUE', exp.right])
+
+            sql_ast = [
+                'INSERT',
+                ['TABLE', self._get_table_name()],
+                fields_ast,
+                values_ast
+            ]
+
+            sql, params = db.ast_translator.translate(sql_ast)
 
             try:
                 id_ = db.execute(sql, params)
@@ -1243,7 +1246,7 @@ class Model(with_metaclass(ModelMeta)):
 
     @classmethod
     def get_sql_ast(cls):
-        return ['QUOTE'] + list(
+        return ['SERIES'] + list(
             map(lambda x: getattr(cls, x).get_sql_ast(), cls.__sorted_fields__)
         )
 
@@ -1318,7 +1321,7 @@ class Model(with_metaclass(ModelMeta)):
         return key.replace(' ', '&nbsp;')
 
     @property
-    def unique_expression_and_params(self):
+    def unique_expression(self):
         keys = []
 
         if self.__primary_key__:
@@ -1327,14 +1330,12 @@ class Model(with_metaclass(ModelMeta)):
             keys = self.__unique_keys__[0]  # pragma: no cover
 
         if not keys:
-            return '', []  # pragma: no cover
+            return None  # pragma: no cover
 
-        expression = reduce(
+        return reduce(
             operator.and_,
             map(lambda k: getattr(self.__class__, k) == getattr(self, k), keys)
         )
-
-        return sql_and_params(expression)
 
     def __repr__(self):
         class_name = self.__class__.__name__

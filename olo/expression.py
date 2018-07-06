@@ -29,6 +29,13 @@ class UnaryExpression(Expression):
         self.value = value
         self.operator = operator
 
+    def get_sql_ast(self):
+        return [
+            'UNARY OPERATE',
+            self.value.get_sql_ast(),
+            self.operator
+        ]
+
     def get_sql_and_params(self):
         left_str, params = sql_and_params(self.value)
         alias_name = getattr(self.value, 'alias_name', None)
@@ -92,7 +99,7 @@ class BinaryExpression(Expression, BinaryOperationMixin):
         )
 
     def get_sql_ast(self):
-        sql_ast = ['OPERATE', self.operator]
+        sql_ast = ['BINARY OPERATE', self.operator]
 
         if isinstance(self.left, SQLASTInterface):
             left_sql_ast = self.left.get_sql_ast()

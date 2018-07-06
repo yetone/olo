@@ -288,7 +288,7 @@ class UnionField(BaseField, SQLLiteralInterface, SQLASTInterface):
         return '({})'.format(', '.join(pieces)), params
 
     def get_sql_ast(self):
-        return ['UNION COLUMN'] + [f.get_sql_ast() for f in self.fields]
+        return ['BRACKET'] + [f.get_sql_ast() for f in self.fields]
 
 
 def _make_db_field_key(uuid, attr_name):
