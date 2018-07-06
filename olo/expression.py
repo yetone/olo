@@ -1,6 +1,6 @@
 from functools import wraps
-from olo.compat import long, basestring
-from olo.interfaces import SQLLiteralInterface
+from olo.compat import long, str_types
+from olo.interfaces import SQLLiteralInterface, SQLASTInterface
 from olo.mixins.operations import BinaryOperationMixin
 from olo.utils import (
     compare_operator_precedence, sql_and_params, get_neg_operator
@@ -18,7 +18,7 @@ def _auto_transform_to_bin_exp(func):
     return wrapper
 
 
-class Expression(SQLLiteralInterface):
+class Expression(SQLLiteralInterface, SQLASTInterface):
     def __neg__(self):
         return  # pragma: no cover
 
@@ -58,7 +58,7 @@ def transform_to_bin_exp(item):
     if isinstance(item, (int, long, float)):
         return field != 0
 
-    if isinstance(item, basestring):
+    if isinstance(item, str_types):
         return funcs.LENGTH(field) > 0
 
     raise TypeError(
@@ -90,6 +90,21 @@ class BinaryExpression(Expression, BinaryOperationMixin):
             right=repr(self.right),
             operator=repr(self.operator)
         )
+
+    def get_sql_ast(self):
+        sql_ast = ['OPERATE', self.operator]
+
+        if isinstance(self.left, SQLASTInterface):
+            left_sql_ast = self.left.get_sql_ast()
+        else:
+            left_sql_ast = ['VALUE', self.left]
+
+        if isinstance(self.right, SQLASTInterface):
+            right_sql_ast = self.right.get_sql_ast()
+        else:
+            right_sql_ast = ['VALUE', self.right]
+
+        return sql_ast + [left_sql_ast] + [right_sql_ast]
 
     def get_sql_and_params(self):
         from .query import Query

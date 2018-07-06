@@ -4,8 +4,8 @@ import json
 from copy import copy
 from collections import defaultdict
 
-from olo.compat import int_types, iteritems, izip, basestring
-from olo.interfaces import SQLLiteralInterface
+from olo.compat import int_types, iteritems, izip, str_types
+from olo.interfaces import SQLLiteralInterface, SQLASTInterface
 from olo.expression import Expression, UnaryExpression, BinaryExpression
 from olo.libs.aes import encrypt, decrypt
 from olo.mixins.operations import UnaryOperationMixin, BinaryOperationMixin
@@ -203,7 +203,7 @@ class BaseField(object):
 
 @attach_func_method
 class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
-            SQLLiteralInterface):
+            SQLLiteralInterface, SQLASTInterface):
 
     UnaryExpression = UnaryExpression
     BinaryExpression = BinaryExpression
@@ -236,6 +236,20 @@ class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
             return '{} AS {}'.format(name, self._alias_name), params
         return name, params
 
+    def get_sql_ast(self):
+        model = self.get_model()
+        table_name = None if not model else model._get_table_name()
+        alias_mapping = context.alias_mapping or {}
+        table_name = alias_mapping.get(table_name, table_name)
+        sql_ast = [
+            'COLUMN',
+            table_name,
+            self.name
+        ]
+        if self._alias_name:
+            sql_ast = ['ALIAS', sql_ast, self._alias_name]
+        return sql_ast
+
 
 class ConstField(Field):
 
@@ -251,7 +265,7 @@ class ConstField(Field):
         return '%s', [self._value]
 
 
-class UnionField(BaseField, SQLLiteralInterface):
+class UnionField(BaseField, SQLLiteralInterface, SQLASTInterface):
 
     def __init__(self, *fields):
         self.fields = fields
@@ -272,6 +286,9 @@ class UnionField(BaseField, SQLLiteralInterface):
             if _params:
                 params.extend(_params)  # pragma: no cover
         return '({})'.format(', '.join(pieces)), params
+
+    def get_sql_ast(self):
+        return ['UNION COLUMN'] + [f.get_sql_ast() for f in self.fields]
 
 
 def _make_db_field_key(uuid, attr_name):
@@ -358,7 +375,7 @@ def _get_db_values(pairs):
 def _get_value_from_db_value(value, version, field):
     if version == 0:
         value = value or {}
-        if isinstance(value, basestring):
+        if isinstance(value, str_types):
             value = json.loads(value)
         value = value.get(field.name, missing)
     return value
@@ -394,7 +411,7 @@ class DbField(BaseField):
         if value is not None or not self.noneable:
             value = transform_type(value, self.type)
         payload = db.db_get(uuid) or {}
-        if isinstance(payload, basestring):
+        if isinstance(payload, str_types):
             payload = json.loads(payload)
         payload[self.name] = value
         db.db_set(uuid, payload)

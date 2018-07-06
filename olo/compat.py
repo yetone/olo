@@ -14,13 +14,14 @@ if PY2:
     import __builtin__ as builtins
     import cPickle as pickle
     from cStringIO import StringIO
-    from Queue import Queue, Empty
+    from Queue import Queue, LifoQueue, Empty
 
     xrange = xrange
     basestring = basestring
     unicode = unicode
     buffer = buffer
     int_types = (int, long)
+    str_types = (basestring,)
     cmp = cmp
     long = long
     reduce = reduce
@@ -53,7 +54,7 @@ else:
     import builtins  # noqa pragma: no cover
     import pickle  # noqa pragma: no cover
     from io import StringIO  # noqa pragma: no cover
-    from queue import Queue, Empty
+    from queue import Queue, LifoQueue, Empty
     from functools import reduce  # noqa pragma: no cover
 
     izip, imap, xrange = zip, map, range  # pragma: no cover
@@ -61,6 +62,7 @@ else:
     unicode = str  # pragma: no cover
     buffer = bytes  # pragma: no cover
     int_types = (int,)  # pragma: no cover
+    str_types = (str,)
     long = int  # pragma: no cover
 
     def cmp(a, b):  # pragma: no cover

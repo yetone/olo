@@ -11,7 +11,7 @@ from itertools import chain, product
 from olo._speedups import decrypt_attrs, parse_attrs
 from olo.cache import CacheWrapper, delete_cache
 from olo.cached_query import CachedQuery
-from olo.compat import (basestring, iteritems, iterkeys, itervalues, izip,
+from olo.compat import (str_types, iteritems, iterkeys, itervalues, izip,
                         long, reduce, values_list, with_metaclass, xrange)
 from olo.context import Context, context, model_instantiate_context
 from olo.errors import DeparseError, ExpressionError, InvalidFieldError
@@ -28,7 +28,7 @@ from olo.utils import (cached_property, camel2underscore, deprecation,
                        override, readonly_cached_property, sql_and_params,
                        type_checker)
 
-VALID_TYPES = (basestring, int, float, long, date)
+VALID_TYPES = str_types + (int, float, long, date)
 PATTERN_N_NAME = re.compile('s$')
 
 
@@ -117,7 +117,7 @@ def _process_key(cls, key):
     for item in key:
         if isinstance(item, Field):
             _key.append(item.attr_name)
-        elif isinstance(item, basestring):
+        elif isinstance(item, str_types):
             attr_name = item
             attr_name = cls.__field_name_map__.get(attr_name, attr_name)
             if not hasattr(cls, attr_name):
@@ -1232,7 +1232,7 @@ class Model(with_metaclass(ModelMeta)):
         )
         if attr_name not in cls.__dict__:
             sql_pieces, _ = get_sql_pieces_and_params(
-                map(lambda x: getattr(cls, x), cls.__sorted_fields__)
+                list(map(lambda x: getattr(cls, x), cls.__sorted_fields__))
             )
             setattr(cls, attr_name, ', '.join(sql_pieces))
         return getattr(cls, attr_name)
@@ -1240,6 +1240,12 @@ class Model(with_metaclass(ModelMeta)):
     @classmethod
     def get_sql_and_params(cls):
         return cls._get_columns_str(), []
+
+    @classmethod
+    def get_sql_ast(cls):
+        return ['QUOTE'] + list(
+            map(lambda x: getattr(cls, x).get_sql_ast(), cls.__sorted_fields__)
+        )
 
     @classmethod
     def _parse_attrs(cls, attrs, decrypt=True, output=True):

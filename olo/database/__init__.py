@@ -8,7 +8,7 @@ from olo.local import DbLocal
 from olo.transaction import Transaction
 from olo.logger import logger
 from olo.errors import DataBaseError
-from olo.compat import basestring, unicode
+from olo.compat import str_types, unicode
 
 
 def need_beansdb(func):
@@ -210,7 +210,7 @@ class BaseDataBase(object):
             return
 
         def mapper(x):
-            if isinstance(x, basestring):
+            if isinstance(x, str_types):
                 return x
 
             try:

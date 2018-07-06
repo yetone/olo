@@ -62,3 +62,13 @@ def model_instantiate_context(ctx):
     finally:
         ctx.in_model_instantiate = _ctx
         ctx.instantiate_depth = _depth
+
+
+@contextmanager
+def alias_mapping_context(alias_mapping):
+    _alias_mapping = context.alias_mapping
+    try:
+        context.alias_mapping = alias_mapping
+        yield
+    finally:
+        context.alias_mapping = _alias_mapping

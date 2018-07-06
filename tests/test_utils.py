@@ -4,7 +4,7 @@ import pickle
 
 from datetime import datetime, date
 
-from olo.compat import PY2, Decimal, basestring, unicode
+from olo.compat import PY2, Decimal, unicode
 from olo.utils import (
     type_checker, transform_type, Missing, ThreadedObject,
     friendly_repr,
@@ -39,7 +39,7 @@ class TestUtils(TestCase):
         self.assertFalse(type_checker({int: [int]}, {1: [1, 2, 3],
                                                      2: [3, 4, 5],
                                                      3: [5, 6, 7, 8, '9']}))
-        self.assertFalse(type_checker({basestring: int}, {'a': 1, 'b': '2'}))
+        self.assertFalse(type_checker({str: int}, {'a': 1, 'b': '2'}))
         self.assertTrue(type_checker((int,), (1,)))
         self.assertFalse(type_checker((int,), (1, 2)))
         self.assertTrue(type_checker((int, str), (1, "a")))

@@ -3,7 +3,7 @@
 import random
 import base64
 from Crypto.Cipher import AES
-from olo.compat import basestring, to_str, unicode, xrange
+from olo.compat import str_types, to_str, unicode, xrange
 
 BS = AES.block_size
 
@@ -20,7 +20,7 @@ def unpad(s):
 
 def encrypt(plain_text, key):
     cipher = AES.new(key)
-    if not isinstance(plain_text, (basestring, int)):
+    if not isinstance(plain_text, str_types + (int,)):
         return plain_text
     plain_text = to_str(plain_text)
     encrypted = cipher.encrypt(pad(plain_text))
@@ -29,7 +29,7 @@ def encrypt(plain_text, key):
 
 def decrypt(cipher_text, key):
     cipher = AES.new(key)
-    if not (cipher_text and isinstance(cipher_text, (basestring, int))):
+    if not (cipher_text and isinstance(cipher_text, str_types + (int,))):
         return cipher_text
     if isinstance(cipher_text, unicode):
         cipher_text = cipher_text.encode('utf-8')

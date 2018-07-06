@@ -6,15 +6,16 @@ import operator
 from itertools import chain
 from decorator import decorator
 
-from olo.compat import izip, imap, basestring, iteritems, reduce
-from olo.interfaces import SQLLiteralInterface
+from olo.compat import izip, imap, str_types, iteritems, reduce, xrange
+from olo.interfaces import SQLLiteralInterface, SQLASTInterface
 from olo.field import Field
 from olo.errors import ExpressionError, OrderByError, SupportError
-from olo.context import field_verbose_context
+from olo.context import field_verbose_context, alias_mapping_context
 from olo.libs.compiler.translators.func_translator import transform_func
 from olo.session import QuerySession
 from olo.utils import (
-    sql_and_params, get_sql_pieces_and_params
+    sql_and_params, get_sql_pieces_and_params,
+    optimize_sql_ast,
 )
 
 
@@ -39,7 +40,7 @@ def _dict_to_expressions(model_class, dct):
 def _process_order_by(model_class, order_by):
     new = []
     for item in order_by:
-        if isinstance(item, basestring):
+        if isinstance(item, str_types):
             _item = item
             _item = _strip_backquote(_item)
             is_negative = bool(PATTERN_NEG.search(_item))
@@ -72,7 +73,24 @@ def _lambda_eval(func, self, *args, **kwargs):
     return func(self, *args, **kwargs)
 
 
-class Query(SQLLiteralInterface):
+def _detect_table_alias(table_section, rev_alias_mapping=None):
+    rev_alias_mapping = {} if rev_alias_mapping is None else rev_alias_mapping
+    if table_section[0] == 'TABLE':
+        alias = table_section[1][0].lower()
+        orig_alias = alias
+        n = 0
+        while alias in rev_alias_mapping:
+            n += 1
+            alias = orig_alias + str(n)
+        rev_alias_mapping[alias] = table_section[1]
+        return ['ALIAS', table_section, alias]
+    elif isinstance(table_section, list):
+        return [_detect_table_alias(x, rev_alias_mapping=rev_alias_mapping)
+                for x in table_section]
+    return table_section
+
+
+class Query(SQLLiteralInterface, SQLASTInterface):
 
     def __init__(self, model_class):
         self._model_class = model_class
@@ -98,7 +116,7 @@ class Query(SQLLiteralInterface):
     def _transform_entities(self, entities):
         res = []
         for item in entities:
-            if isinstance(item, basestring):
+            if isinstance(item, str_types):
                 field = self._model_class._olo_get_field(item)
                 if field is not None:
                     item = field
@@ -308,6 +326,61 @@ class Query(SQLLiteralInterface):
 
         return self.db.execute(sql, params)
 
+    def get_sql_ast(self, base_sql_ast=None, alias_mapping=None):
+        sql_ast = self.get_primitive_sql_ast(
+            base_sql_ast=base_sql_ast, alias_mapping=alias_mapping)
+        return optimize_sql_ast(sql_ast)
+
+    def get_primitive_sql_ast(self, base_sql_ast=None, alias_mapping=None):
+        if base_sql_ast is None:
+            base_sql_ast, alias_mapping = self._get_base_sql_ast()
+        alias_mapping = alias_mapping or {}
+        with alias_mapping_context(alias_mapping):
+            return self._get_primitive_sql_ast(base_sql_ast)
+
+    def _get_primitive_sql_ast(self, base_sql_ast):
+        sql_ast = [x for x in base_sql_ast]
+        if self._on_expressions:
+            sql_ast.append([
+                'ON',
+                ['AND'] + [e.get_sql_ast() for e in self._on_expressions]
+            ])
+        if self._expressions:
+            sql_ast.append([
+                'WHERE',
+                ['AND'] + [e.get_sql_ast() for e in self._expressions]
+            ])
+
+        if self._group_by:
+            fields = self._get_fields(self._group_by)
+            sql_ast.append([
+                'GROUP BY',
+                ['AND'] + [f.get_sql_ast() for f in fields]
+            ])
+
+        if self._having_expressions:
+            sql_ast.append([
+                'HAVING',
+                ['AND'] + [e.get_sql_ast() for e in self._having_expressions]
+            ])
+
+        if self._order_by:
+            fields = self._get_fields(self._order_by)
+            sql_ast.append([
+                'ORDER BY',
+                ['QUOTE'] + [f.get_sql_ast() for f in fields]
+            ])
+
+        if self._limit is not None:
+            limit_section = ['LIMIT', 0, ['VALUE', self._limit]]
+
+            if self._offset is not None:
+                limit_section[1] = ['VALUE', self._offset]
+
+            sql_ast.append(limit_section)
+
+        return sql_ast
+
     def get_sql_and_params(self, base_sql=None, base_params=None):  # pylint: disable=W
         # pylint: disable=E1121,E1129
         with field_verbose_context(
@@ -399,6 +472,52 @@ class Query(SQLLiteralInterface):
         sql_pieces, params = get_sql_pieces_and_params(self._entities)
         columns_str = ', '.join(sql_pieces)
         return columns_str, params
+
+    def _get_base_sql_ast(self, modifier=None, entities=None):
+        entities = self._entities if entities is None else entities
+
+        if self._join:
+            table_section = [
+                'JOIN',
+                ['TABLE', self.table_name],
+                ['TABLE', self._join._get_table_name()]
+            ]
+        elif self._left_join:
+            table_section = [
+                'LEFT JOIN',
+                ['TABLE', self.table_name],
+                ['TABLE', self._left_join._get_table_name()]
+            ]
+        elif self._right_join:
+            table_section = [
+                'RIGHT JOIN',
+                ['TABLE', self.table_name],
+                ['TABLE', self._left_join._get_table_name()]
+            ]
+        else:
+            table_section = ['TABLE', self.table_name]
+
+        rev_alias_mapping = {}
+        table_section = _detect_table_alias(
+            table_section,
+            rev_alias_mapping=rev_alias_mapping
+        )
+
+        alias_mapping = {v: k for k, v in iteritems(rev_alias_mapping)}
+
+        with alias_mapping_context(alias_mapping):
+            select_ast = [
+                'QUOTE',
+            ] + [e.get_sql_ast() for e in entities]
+            if len(select_ast) == 2 and select_ast[1][0] == 'QUOTE':
+                select_ast = select_ast[1]
+            if modifier is not None:
+                select_ast = ['MODIFIER', modifier, select_ast]
+
+        sql_ast = ['SELECT']
+        sql_ast.append(select_ast)
+        sql_ast.append(['FROM', table_section])
+        return sql_ast, alias_mapping
 
     def _get_base_sql_and_params(self, modifiers=None, select_expr=None,
                                  select_params=None):
@@ -494,21 +613,28 @@ class Query(SQLLiteralInterface):
         for entity in session.entities:
             yield entity
 
-    def _get_field_strs_and_params(self, fields):
+    def _get_fields(self, fields):
         if not isinstance(fields, (list, tuple)):
             fields = [fields]  # pragma: no cover
 
-        strs = []
-        params = []
+        res = []
 
         for field in fields:
-            if isinstance(field, basestring):
+            if isinstance(field, str_types):
                 _field = getattr(self._model_class, field, None)
                 if not _field:
                     raise ExpressionError('Cannot find field: `{}`'.format(  # noqa pragma: no cover pylint: disable=W
                         field
                     ))
                 field = _field
+            res.append(field)
+        return res
+
+    def _get_field_strs_and_params(self, fields):
+        strs = []
+        params = []
+
+        for field in self._get_fields(fields):
 
             sql, _params = sql_and_params(field)
             if _params:

@@ -4,7 +4,7 @@ import logging
 
 from functools import wraps
 
-from olo.compat import izip, basestring, iteritems
+from olo.compat import izip, str_types, iteritems
 from olo.events import after_delete, after_insert, after_update, before_update
 from olo.key import StrKey
 from olo.errors import CacheError
@@ -316,7 +316,7 @@ class CacheWrapper(object):
 
 def get_str_key(keys):
     return StrKey(
-        k.attr_name if not isinstance(k, basestring) else k
+        k.attr_name if not isinstance(k, str_types) else k
         for k in keys
     )
 

@@ -14,7 +14,7 @@ from olo.errors import (
     ValidationError, ParseError, InvalidFieldError
 )
 from olo.migration import MigrationVersion
-from olo.compat import PY2, basestring, xrange, to_str
+from olo.compat import PY2, str_types, xrange, to_str
 from .base import db, TestCase, BaseModel, Dummy, Bar, db, Ttt, Foo, Lala
 from .utils import auto_use_cache_ctx, patched_execute
 
@@ -553,7 +553,7 @@ class TestModel(TestCase):
         dct = dummy.to_dict()
         self.assertTrue(isinstance(dct['created_at'], datetime))
         dct = dummy.to_dict(jsonize=True)
-        self.assertTrue(isinstance(dct['created_at'], basestring))
+        self.assertTrue(isinstance(dct['created_at'], str_types))
         self.assertEqual(dct['name'], attrs['name'])
         dct = dummy.to_dict(excludes=['created_at'])
         self.assertTrue('created_at' not in dct)

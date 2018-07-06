@@ -4,7 +4,7 @@ import io
 import sys
 import types
 
-from olo.compat import imap, pickle, basestring
+from olo.compat import imap, pickle, str_types
 
 
 def throw(exp, *args):
@@ -46,14 +46,14 @@ def get_globals_and_locals(args, kwargs, frame_depth, from_generator=False):
     assert args_len > 0
     func = args[0]
     if from_generator:
-        if not isinstance(func, (basestring, types.GeneratorType)):
+        if not isinstance(func, str_types + (types.GeneratorType,)):
             throw(
                 TypeError,
                 'The first positional argument must be generator expression or'
                 ' its text source. Got: %r' % func
             )
     else:
-        if not isinstance(func, (basestring, types.FunctionType)):
+        if not isinstance(func, str_types + (types.FunctionType,)):
             throw(
                 TypeError,
                 'The first positional argument must be lambda function or'

@@ -1,6 +1,6 @@
 import math
 
-from olo.interfaces import SQLLiteralInterface
+from olo.interfaces import SQLLiteralInterface, SQLASTInterface
 from olo.mixins.operations import BinaryOperationMixin
 from olo.utils import missing, sql_and_params
 from olo.compat import with_metaclass
@@ -76,7 +76,8 @@ class FunctionMeta(type):
 
 class Function(
         with_metaclass(
-            FunctionMeta, SQLLiteralInterface, BinaryOperationMixin
+            FunctionMeta, SQLLiteralInterface, BinaryOperationMixin,
+            SQLASTInterface
         )
 ):
 
@@ -117,8 +118,39 @@ class Function(
             ), params
         return s, params
 
+    def _get_sql_ast(self):
+        sql_ast = [
+            'CALL',
+            self.__class__.__name__.upper()
+        ] + [arg.get_sql_ast() if isinstance(arg, SQLASTInterface) else arg
+             for arg in self.args]
+        return sql_ast
+
+    def get_sql_ast(self):
+        sql_ast = self._get_sql_ast()
+        if self.alias_name:
+            sql_ast = ['ALIAS', sql_ast, self.alias_name]
+        return sql_ast
+
 
 class COUNT(Function):
+    def _get_sql_ast(self):
+        from olo.model import ModelMeta
+        from olo.expression import BinaryExpression
+
+        if len(self.args) == 1:
+            if isinstance(
+                    self.args[0], ModelMeta
+            ):
+                return ['CALL', 'COUNT', 1]
+            if isinstance(
+                    self.args[0], BinaryExpression
+            ):
+                ifexp = IF(self.args[0]).THEN(1).ELSE(None)
+                _str, params = ifexp.get_sql_and_params()
+                return ['CALL', 'COUNT', _str]
+        return super(COUNT, self)._get_sql_ast()
+
     def _get_sql_and_params(self):
         from olo.model import ModelMeta
         from olo.expression import BinaryExpression

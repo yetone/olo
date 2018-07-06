@@ -53,7 +53,7 @@ from olo.libs.compiler.consts import (
     CO_VARARGS, CO_VARKEYWORDS, OP_ASSIGN, OP_DELETE, OP_APPLY
 )
 
-from olo.compat import PY2, unicode
+from olo.compat import PY2, unicode, str_types
 
 # Python 2.6 compatibility fix
 if not hasattr(symbol, 'testlist_comp'):
@@ -189,7 +189,7 @@ class Transformer:
 
     def parsefile(self, file):
         """Return a modified parse tree for the contents of the given file."""
-        if isinstance(file, basestring):
+        if isinstance(file, str_types):
             file = open(file)
         return self.parsesuite(file.read())
 

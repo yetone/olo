@@ -10,7 +10,8 @@ from ast import literal_eval
 from datetime import datetime, date
 
 from olo.compat import (
-    PY2, Decimal, unicode, iteritems, basestring, items_list
+    PY2, Decimal, unicode, iteritems, str_types, items_list,
+    LifoQueue,
 )
 
 
@@ -122,7 +123,7 @@ def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
             return obj.decode('utf-8')  # pragma: no cover
         return type_(obj)  # pragma: no cover
     if type_ in (list, dict):
-        if isinstance(obj, basestring):
+        if isinstance(obj, str_types):
             obj = json.loads(obj)
             if isinstance(obj, type_):
                 return obj
@@ -133,7 +134,7 @@ def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
             return obj.date()
         return obj
     if type_ is tuple:
-        if isinstance(obj, basestring):
+        if isinstance(obj, str_types):
             obj = literal_eval(obj)
             if isinstance(obj, type_):
                 return obj
@@ -143,7 +144,7 @@ def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
             return type_(str(obj))
         return type_(obj)
     t = type(type_)
-    if t in (list, dict) and isinstance(obj, basestring):
+    if t in (list, dict) and isinstance(obj, str_types):
         obj = json.loads(obj)
     if not isinstance(obj, t):
         raise TypeError('{} is not a {} type.'.format(repr(obj), t))
@@ -380,3 +381,29 @@ def parse_execute_sql(sql):
 
 def get_thread_ident():
     return threading.currentThread().ident
+
+
+def car(lst):
+    return lst[0]
+
+
+def cdr(lst):
+    return lst[1:]
+
+
+def optimize_sexp(sexp):
+    if not isinstance(sexp, list):
+        return sexp
+    head = car(sexp)
+    tail = cdr(sexp)
+    if head == 'VALUE':
+        return sexp
+    if head in ('AND', 'OR'):
+        if len(tail) == 1:
+            return optimize_sexp(tail[0])
+        return [head] + [optimize_sexp(x) for x in tail]
+    return [optimize_sexp(x) for x in sexp]
+
+
+def optimize_sql_ast(sql_ast):
+    return [optimize_sexp(sexp) for sexp in sql_ast]
