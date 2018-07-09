@@ -30,6 +30,7 @@
     <a href="https://yetone.github.io/olo/">查看文档 📖</a>
 </p>
 
-## TL;DR
-
-<img src="https://rawcdn.githack.com/yetone/figure_bed/master/olo1.svg" />
+<h2 align="center">TL;DR</h2>
+<p align="center">
+    <img src="https://rawcdn.githack.com/yetone/figure_bed/master/olo1.svg" />
+</p>
