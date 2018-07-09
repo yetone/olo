@@ -13,7 +13,7 @@ from olo.cache import CacheWrapper, delete_cache
 from olo.cached_query import CachedQuery
 from olo.compat import (str_types, iteritems, iterkeys, itervalues, izip,
                         long, reduce, values_list, with_metaclass, xrange)
-from olo.context import Context, context, model_instantiate_context
+from olo.context import Context, model_instantiate_context
 from olo.errors import DeparseError, ExpressionError, InvalidFieldError
 from olo.events import after_delete, after_insert, after_update, before_update
 from olo.expression import BinaryExpression, Expression
@@ -24,9 +24,8 @@ from olo.funcs import RAND
 from olo.key import StrKey
 from olo.query import Query
 from olo.utils import (cached_property, camel2underscore, deprecation,
-                       friendly_repr, get_sql_pieces_and_params, missing,
-                       override, readonly_cached_property, sql_and_params,
-                       type_checker)
+                       friendly_repr, missing, override,
+                       readonly_cached_property, type_checker)
 
 VALID_TYPES = str_types + (int, float, long, date)
 PATTERN_N_NAME = re.compile('s$')
@@ -938,16 +937,6 @@ class Model(with_metaclass(ModelMeta)):
         expressions, _, _ = self._split_attrs(sql_attrs)
 
         if expressions:
-            sql_pieces = []
-            params = []
-
-            for exp in expressions:
-                piece, _ = sql_and_params(exp.left)
-                _, _params = sql_and_params(exp)
-                sql_pieces.append(piece)
-                if _params:
-                    params.extend(_params)
-
             fields_ast = ['BRACKET']
             values_ast = ['VALUES']
 
@@ -1228,26 +1217,21 @@ class Model(with_metaclass(ModelMeta)):
         return cls._options.db
 
     @classmethod
-    def _get_columns_str(cls):
-        table_name = cls._get_table_name()
-        attr_name = '_{}_{}_columns_str'.format(
-            table_name, bool(context.field_verbose)
-        )
-        if attr_name not in cls.__dict__:
-            sql_pieces, _ = get_sql_pieces_and_params(
-                list(map(lambda x: getattr(cls, x), cls.__sorted_fields__))
-            )
-            setattr(cls, attr_name, ', '.join(sql_pieces))
-        return getattr(cls, attr_name)
-
-    @classmethod
-    def get_sql_and_params(cls):
-        return cls._get_columns_str(), []
-
-    @classmethod
     def get_sql_ast(cls):
+        # table_name = cls._get_table_name()
+        # attr_name = '_{}_as_{}_sql_ast'.format(
+        #     table_name, (context.table_alias_mapping or {}).get(table_name)
+        # )
+        # if attr_name not in cls.__dict__:
+        #     sql_ast = ['SERIES'] + list(
+        #         map(lambda x: getattr(cls, x).get_sql_ast(),
+        #             cls.__sorted_fields__)
+        #     )
+        #     setattr(cls, attr_name, sql_ast)
+        # return getattr(cls, attr_name)
         return ['SERIES'] + list(
-            map(lambda x: getattr(cls, x).get_sql_ast(), cls.__sorted_fields__)
+            map(lambda x: getattr(cls, x).get_sql_ast(),
+                cls.__sorted_fields__)
         )
 
     @classmethod

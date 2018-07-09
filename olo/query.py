@@ -6,17 +6,14 @@ import operator
 from itertools import chain
 from decorator import decorator
 
-from olo.compat import izip, imap, str_types, iteritems, reduce, xrange
-from olo.interfaces import SQLLiteralInterface, SQLASTInterface
+from olo.compat import izip, imap, str_types, iteritems, reduce
+from olo.interfaces import SQLASTInterface
 from olo.field import Field
 from olo.errors import ExpressionError, OrderByError, SupportError
-from olo.context import field_verbose_context, alias_mapping_context
+from olo.context import table_alias_mapping_context
 from olo.libs.compiler.translators.func_translator import transform_func
 from olo.session import QuerySession
-from olo.utils import (
-    sql_and_params, get_sql_pieces_and_params,
-    optimize_sql_ast,
-)
+from olo.utils import optimize_sql_ast
 
 
 PATTERN_NEG = re.compile(r'^\-')
@@ -90,7 +87,7 @@ def _detect_table_alias(table_section, rev_alias_mapping=None):
     return table_section
 
 
-class Query(SQLLiteralInterface, SQLASTInterface):
+class Query(SQLASTInterface):
 
     def __init__(self, model_class):
         self._model_class = model_class
@@ -273,7 +270,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
     __len__ = count
 
     def update(self, **values):
-        expression, _ = self._get_expression_and_params()
+        expression = self._get_expression()
         if not expression:
             raise ExpressionError('Cannot execute update because of '
                                   'without expression')
@@ -291,7 +288,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
         return rows
 
     def delete(self):
-        expression, _ = self._get_expression_and_params()
+        expression = self._get_expression()
         if not expression:
             raise ExpressionError('Cannot execute delete because of '
                                   'without expression')
@@ -342,7 +339,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
         if base_sql_ast is None:
             base_sql_ast, alias_mapping = self._get_base_sql_ast()
         alias_mapping = alias_mapping or {}
-        with alias_mapping_context(alias_mapping):
+        with table_alias_mapping_context(alias_mapping):
             return self._get_primitive_sql_ast(base_sql_ast)
 
     def _get_primitive_sql_ast(self, base_sql_ast):
@@ -388,79 +385,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
 
         return sql_ast
 
-    def get_sql_and_params(self, base_sql=None, base_params=None):  # pylint: disable=W
-        # pylint: disable=E1121,E1129
-        with field_verbose_context(
-            bool(self._join or self._left_join or self._right_join)
-        ):
-            # pylint: enable=E1121,E1129
-            return self._get_sql_and_params(
-                base_sql=base_sql, base_params=base_params,
-            )
-
-    def _get_sql_and_params(self, base_sql=None, base_params=None):
-        base_params = base_params or []
-        start = self._offset
-        order_by = self._order_by
-        group_by = self._group_by
-        limit = self._limit
-
-        params = []
-
-        expression, where_params = self._get_expression_and_params()
-        having_expression, having_params = self._get_expression_and_params(
-            is_having=True
-        )
-        on_expression, on_params = self._get_expression_and_params(
-            is_on=True
-        )
-
-        if base_sql is None:
-            base_sql, _base_params = self._get_base_sql_and_params()
-
-            base_params = base_params + _base_params
-
-        params.extend(base_params)
-
-        sql = base_sql
-
-        if on_expression:
-            sql += 'ON {expression} '.format(expression=on_expression)
-            params.extend(on_params)
-
-        if expression:
-            sql += 'WHERE {expression} '.format(expression=expression)
-            params.extend(where_params)
-
-        if group_by:
-            strs, _params = self._get_field_strs_and_params(group_by)
-            if strs:
-                sql += 'GROUP BY {group_by} '.format(
-                    group_by=', '.join(strs)
-                )
-                params.extend(_params)
-
-        if having_expression:
-            sql += 'HAVING {expression} '.format(expression=having_expression)
-            params.extend(having_params)
-
-        if order_by:
-            strs, _params = self._get_field_strs_and_params(order_by)
-            if strs:
-                sql += 'ORDER BY {order_by} '.format(
-                    order_by=', '.join(strs)
-                )
-                params.extend(_params)
-
-        if limit is not None:
-            sql += 'LIMIT {limit} '.format(limit=limit)
-
-            if start:
-                sql += 'OFFSET {start} '.format(start=start)
-
-        return sql, params
-
-    def _get_expression_and_params(self, is_having=False, is_on=False):
+    def _get_expression(self, is_having=False, is_on=False):
         if is_having:
             expressions = self._having_expressions
         elif is_on:
@@ -469,16 +394,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
             expressions = self._expressions
 
         if expressions:
-            expression = reduce(operator.and_, expressions)
-
-            return sql_and_params(expression)
-
-        return '', []
-
-    def _get_columns_str_and_params(self):
-        sql_pieces, params = get_sql_pieces_and_params(self._entities)
-        columns_str = ', '.join(sql_pieces)
-        return columns_str, params
+            return reduce(operator.and_, expressions)
 
     def _get_base_sql_ast(self, modifier=None, entities=None):
         entities = self._entities if entities is None else entities
@@ -512,7 +428,7 @@ class Query(SQLLiteralInterface, SQLASTInterface):
 
         alias_mapping = {v: k for k, v in iteritems(rev_alias_mapping)}
 
-        with alias_mapping_context(alias_mapping):
+        with table_alias_mapping_context(alias_mapping):
             select_ast = [
                 'SERIES',
             ] + [e.get_sql_ast() if hasattr(e, 'get_sql_ast') else e
@@ -526,39 +442,6 @@ class Query(SQLLiteralInterface, SQLASTInterface):
         sql_ast.append(select_ast)
         sql_ast.append(['FROM', table_section])
         return sql_ast, alias_mapping
-
-    def _get_base_sql_and_params(self, modifiers=None, select_expr=None,
-                                 select_params=None):
-        select_params = select_params or []
-        if self._join:
-            table_name = '`%s` JOIN `%s`' % (
-                self.table_name, self._join._get_table_name()
-            )
-        elif self._left_join:
-            table_name = '`%s` LEFT JOIN `%s`' % (
-                self.table_name, self._left_join._get_table_name()
-            )
-        elif self._right_join:
-            table_name = '`%s` RIGHT JOIN `%s`' % (
-                self.table_name, self._right_join._get_table_name()
-            )
-        else:
-            table_name = '`%s`' % self.table_name
-
-        if modifiers:
-            prefix = '{} '.format(modifiers)
-        else:
-            prefix = ''
-
-        if select_expr is None:
-            select_expr, _select_params = self._get_columns_str_and_params()
-            select_params = select_params + _select_params
-
-        return 'SELECT {prefix}{select_expr} FROM {table_name} '.format(
-            prefix=prefix,
-            select_expr=select_expr,
-            table_name=table_name
-        ), select_params
 
     # pylint: disable=E0602
     def _iter_wrap_rv(self, rv):
@@ -637,20 +520,3 @@ class Query(SQLLiteralInterface, SQLASTInterface):
                 field = _field
             res.append(field)
         return res
-
-    def _get_field_strs_and_params(self, fields):
-        strs = []
-        params = []
-
-        for field in self._get_fields(fields):
-
-            sql, _params = sql_and_params(field)
-            if _params:
-                params.extend(_params)
-
-            alias_name = getattr(field, 'alias_name', None)
-            if alias_name:
-                strs.append(alias_name)
-            else:
-                strs.append(sql)
-        return strs, params

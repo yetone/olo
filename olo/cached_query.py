@@ -1,4 +1,4 @@
-from olo.interfaces import SQLLiteralInterface
+from olo.interfaces import SQLASTInterface
 from olo.query import Query
 
 
@@ -50,7 +50,7 @@ class CachedQuery(Query):
             ):
                 return False
             if hasattr(exp, 'right'):
-                if isinstance(exp.right, SQLLiteralInterface):
+                if isinstance(exp.right, SQLASTInterface):
                     return False
         return True
 

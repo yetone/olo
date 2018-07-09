@@ -11,7 +11,6 @@ from datetime import datetime, date
 
 from olo.compat import (
     PY2, Decimal, unicode, iteritems, str_types, items_list,
-    LifoQueue,
 )
 
 
@@ -288,25 +287,6 @@ def compare_operator_precedence(a, b):
     if ap > bp:
         return 1
     return -1
-
-
-def sql_and_params(v, coerce=str):
-    if hasattr(v, 'get_sql_and_params'):
-        return v.get_sql_and_params()
-    return coerce(v), []
-
-
-def get_sql_pieces_and_params(exps, coerce=str):
-    pieces = []
-    params = []
-
-    for exp in exps:
-        piece, _params = sql_and_params(exp)
-        pieces.append(piece)
-        if _params:
-            params.extend(_params)
-
-    return pieces, params
 
 
 def friendly_repr(v):

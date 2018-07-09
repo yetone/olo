@@ -89,6 +89,8 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         if context.alias_only:
             return alias, []
         sql_piece, params = self.translate(raw)
+        if is_sql_ast(raw) and raw[0] not in ('COLUMN', 'TABLE'):
+            sql_piece = '({})'.format(sql_piece)
         return '{} AS {}'.format(sql_piece, alias), params
 
     def post_FROM(self, arg):
@@ -183,7 +185,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
     def post_BINARY_OPERATE(self, operator, left, right):
         left_sql_piece, left_params = self.translate(left)
         right_sql_piece, right_params = self.translate(right)
-        ops = ('UNARY OPERATE', 'BINARY OPERATE')
+        ops = ('UNARY_OPERATE', 'BINARY_OPERATE')
         if is_sql_ast(left) and car(left) in ops:
             _cmp = compare_operator_precedence(
                 left[1], operator
@@ -224,3 +226,20 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
             sql_pieces.append(sql_piece)
             params.extend(_params)
         return ' OR '.join(sql_pieces), params
+
+    def post_IF(self, test_ast, then_ast, else_ast):
+        params = []
+        sql_pieces = ['CASE WHEN']
+        test_sql_piece, test_params = self.translate(test_ast)
+        params.extend(test_params)
+        sql_pieces.append(test_sql_piece)
+        then_sql_piece, then_params = self.translate(then_ast)
+        params.extend(then_params)
+        sql_pieces.append('THEN')
+        sql_pieces.append(then_sql_piece)
+        else_sql_piece, else_params = self.translate(else_ast)
+        params.extend(else_params)
+        sql_pieces.append('ELSE')
+        sql_pieces.append(else_sql_piece)
+        sql_pieces.append('END')
+        return ' '.join(sql_pieces), params

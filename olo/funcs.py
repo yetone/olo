@@ -1,8 +1,8 @@
 import math
 
-from olo.interfaces import SQLLiteralInterface, SQLASTInterface
+from olo.interfaces import SQLASTInterface
 from olo.mixins.operations import BinaryOperationMixin
-from olo.utils import missing, sql_and_params
+from olo.utils import missing
 from olo.compat import with_metaclass
 from olo.errors import SupportError
 
@@ -50,7 +50,7 @@ class FunctionMeta(type):
             q = arg
             if cls.__name__ != 'COUNT' and (
                     len(q._entities) != 1 or not isinstance(
-                        q._entities[0], SQLLiteralInterface
+                        q._entities[0], SQLASTInterface
                     )
             ):
                 raise SupportError(
@@ -76,7 +76,7 @@ class FunctionMeta(type):
 
 class Function(
         with_metaclass(
-            FunctionMeta, SQLLiteralInterface, BinaryOperationMixin,
+            FunctionMeta, BinaryOperationMixin,
             SQLASTInterface
         )
 ):
@@ -90,33 +90,6 @@ class Function(
         inst = self.__class__(*self.args)
         inst._alias_name = name
         return inst
-
-    def _get_sql_and_params(self):
-        pieces = []
-        params = []
-
-        for arg in self.args:
-            piece, _params = sql_and_params(arg, coerce=repr)
-
-            pieces.append(piece)
-            if _params:
-                params.extend(_params)
-
-        s = '{}({})'.format(
-            self.__class__.__name__.upper(),
-            ', '.join(pieces)
-        )
-
-        return s, params
-
-    def get_sql_and_params(self):
-        s, params = self._get_sql_and_params()
-
-        if self.alias_name:
-            return '{} AS {}'.format(
-                s, self.alias_name
-            ), params
-        return s, params
 
     def _get_sql_ast(self):
         sql_ast = [
@@ -151,23 +124,6 @@ class COUNT(Function):
                 return ['CALL', 'COUNT', sql_ast]
         return super(COUNT, self)._get_sql_ast()
 
-    def _get_sql_and_params(self):
-        from olo.model import ModelMeta
-        from olo.expression import BinaryExpression
-
-        if len(self.args) == 1:
-            if isinstance(
-                    self.args[0], ModelMeta
-            ):
-                return 'COUNT(1)', []
-            if isinstance(
-                    self.args[0], BinaryExpression
-            ):
-                ifexp = IF(self.args[0]).THEN(1).ELSE(None)
-                _str, params = ifexp.get_sql_and_params()
-                return 'COUNT({})'.format(_str), params
-        return super(COUNT, self)._get_sql_and_params()
-
 
 class SUM(Function):
     pass
@@ -201,12 +157,6 @@ class RAND(Function):
     pass
 
 
-def _get_sql_and_params(item):
-    if isinstance(item, SQLLiteralInterface):
-        return item.get_sql_and_params()  # pragma: no cover
-    return '%s', [item]
-
-
 class IF(Function):
     def __init__(self, *args):
         assert len(args) == 1
@@ -233,32 +183,28 @@ class IF(Function):
         self._else = _else
         return self
 
-    def get_sql_and_params(self):
-        params = []
+    def _get_sql_ast(self):
+        if hasattr(self._test, 'get_sql_ast'):
+            test_ast = self._test.get_sql_ast()
+        else:
+            test_ast = ['VALUE', self._test]
 
-        test_str, test_params = sql_and_params(self._test)
+        if hasattr(self._then, 'get_sql_ast'):
+            then_ast = self._then.get_sql_ast()
+        else:
+            then_ast = ['VALUE', self._then]
 
-        s = 'CASE WHEN {}'.format(test_str)
-        params += test_params
+        if hasattr(self._else, 'get_sql_ast'):
+            else_ast = self._else.get_sql_ast()
+        else:
+            else_ast = ['VALUE', self._else]
 
-        if self._then is not missing:
-            _str, _params = _get_sql_and_params(self._then)
-            s += ' THEN {}'.format(_str)
-            params += _params
-
-        if self._else is not missing:
-            _str, _params = _get_sql_and_params(self._else)
-            s += ' ELSE {}'.format(_str)
-            params += _params
-
-        s += ' END'
-
-        if self.alias_name:
-            return '({}) AS {}'.format(
-                s, self.alias_name
-            ), params
-
-        return s, params
+        return [
+            'IF',
+            test_ast,
+            then_ast,
+            else_ast
+        ]
 
 
 g = globals()

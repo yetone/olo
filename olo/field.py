@@ -5,7 +5,7 @@ from copy import copy
 from collections import defaultdict
 
 from olo.compat import int_types, iteritems, izip, str_types
-from olo.interfaces import SQLLiteralInterface, SQLASTInterface
+from olo.interfaces import SQLASTInterface
 from olo.expression import Expression, UnaryExpression, BinaryExpression
 from olo.libs.aes import encrypt, decrypt
 from olo.mixins.operations import UnaryOperationMixin, BinaryOperationMixin
@@ -203,7 +203,7 @@ class BaseField(object):
 
 @attach_func_method
 class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
-            SQLLiteralInterface, SQLASTInterface):
+            SQLASTInterface):
 
     UnaryExpression = UnaryExpression
     BinaryExpression = BinaryExpression
@@ -225,21 +225,10 @@ class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
         inst._alias_name = name
         return inst
 
-    def _get_sql_and_params(self):
-        params = []
-        name = self.formatted_name
-        return name, params
-
-    def get_sql_and_params(self):
-        name, params = self._get_sql_and_params()
-        if self._alias_name:
-            return '{} AS {}'.format(name, self._alias_name), params
-        return name, params
-
     def get_sql_ast(self):
         model = self.get_model()
         table_name = None if not model else model._get_table_name()
-        alias_mapping = context.alias_mapping or {}
+        alias_mapping = context.table_alias_mapping or {}
         table_name = alias_mapping.get(table_name, table_name)
         sql_ast = [
             'COLUMN',
@@ -261,11 +250,11 @@ class ConstField(Field):
     def formatted_name(self):
         return repr(self._value)  # pragma: no cover
 
-    def get_sql_and_params(self):
-        return '%s', [self._value]
+    def get_sql_ast(self):
+        return ['VALUE', self._value]
 
 
-class UnionField(BaseField, SQLLiteralInterface, SQLASTInterface):
+class UnionField(BaseField, SQLASTInterface):
 
     def __init__(self, *fields):
         self.fields = fields
@@ -276,16 +265,6 @@ class UnionField(BaseField, SQLLiteralInterface, SQLASTInterface):
 
     def not_in_(self, other):
         return BinaryExpression(self, other, 'NOT IN')
-
-    def get_sql_and_params(self):
-        pieces = []
-        params = []
-        for f in self.fields:
-            sql, _params = f.get_sql_and_params()
-            pieces.append(sql)
-            if _params:
-                params.extend(_params)  # pragma: no cover
-        return '({})'.format(', '.join(pieces)), params
 
     def get_sql_ast(self):
         return ['BRACKET'] + [f.get_sql_ast() for f in self.fields]

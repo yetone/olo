@@ -75,10 +75,10 @@ def model_instantiate_context(ctx):
 
 
 @contextmanager
-def alias_mapping_context(alias_mapping):
-    _alias_mapping = context.alias_mapping
+def table_alias_mapping_context(alias_mapping):
+    _alias_mapping = context.table_alias_mapping
     try:
-        context.alias_mapping = alias_mapping
+        context.table_alias_mapping = alias_mapping
         yield
     finally:
-        context.alias_mapping = _alias_mapping
+        context.table_alias_mapping = _alias_mapping
