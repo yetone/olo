@@ -307,6 +307,22 @@ class TestQuery(TestCase):
         )
         res = q.all()
         self.assertEqual(res, [2, 1, None])
+        q = Dummy.query(Dummy.id).join(Dummy)
+        self.assertEqual(
+            q.get_sql_ast(),
+            ['SELECT',
+             ['SERIES',
+              ['COLUMN', 'd1', 'id']],
+             ['FROM',
+              ['JOIN',
+               ['ALIAS',
+                ['TABLE', 'dummy'],
+                'd'],
+               ['ALIAS',
+                ['TABLE', 'dummy'],
+                'd1']]],
+             ]
+        )
 
     def test_order_by(self):
         Dummy.create(name='foo0', age=3)

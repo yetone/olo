@@ -283,10 +283,10 @@ def compare_operator_precedence(a, b):
     ap = get_operator_precedence(a.upper())
     bp = get_operator_precedence(b.upper())
     if ap == bp:
-        return 0
+        return 0  # pragma: no cover
     if ap > bp:
         return 1
-    return -1
+    return -1  # pragma: no cover
 
 
 def friendly_repr(v):
@@ -315,7 +315,7 @@ def make_thread_safe_class(base, method_names=()):
     def make_method(name):
         def method(self, *args, **kwargs):
             with self.lock:  # pragma: no cover
-                return getattr(super(__class__, self), name)(*args, **kwargs)  # pragma: no cover
+                return getattr(super(__class__, self), name)(*args, **kwargs)  # noqa pragma: no cover
         method.__name__ = name
         return method
 
@@ -348,7 +348,7 @@ def parse_execute_sql(sql):
     cmd = sql.split(' ', 1)[0].lower()
 
     if cmd not in SQL_PATTERNS:
-        raise Exception('SQL command %s is not yet supported' % cmd)  # pragma: no cover
+        raise Exception('SQL command %s is not yet supported' % cmd)  # noqa pragma: no cover
 
     match = SQL_PATTERNS[cmd].match(sql)
     if not match:
@@ -393,5 +393,5 @@ def is_sql_ast(lst):
     if not isinstance(lst, list) or not lst:
         return False
     if not isinstance(lst[0], str_types):
-        return False
+        return False  # pragma: no cover
     return lst[0].upper() == lst[0]

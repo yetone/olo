@@ -387,9 +387,9 @@ class Query(SQLASTInterface):
 
     def _get_expression(self, is_having=False, is_on=False):
         if is_having:
-            expressions = self._having_expressions
+            expressions = self._having_expressions  # pragma: no cover
         elif is_on:
-            expressions = self._on_expressions
+            expressions = self._on_expressions  # pragma: no cover
         else:
             expressions = self._expressions
 

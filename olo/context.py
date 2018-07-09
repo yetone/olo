@@ -23,34 +23,6 @@ class Context(object):
 context = Context()
 
 
-def switch_context(func):
-    ctx_func = contextmanager(func)
-
-    def _(enable=False):
-        if enable:
-            return ctx_func()
-
-        @contextmanager
-        def __():
-            try:
-                yield
-            finally:
-                pass
-
-        return __()
-    return _
-
-
-@switch_context
-def field_verbose_context():
-    _field_verbose = context.field_verbose
-    try:
-        context.field_verbose = True
-        yield
-    finally:
-        context.field_verbose = _field_verbose
-
-
 @contextmanager
 def alias_only_context(alias_only=True):
     _alias_only = context.alias_only

@@ -107,7 +107,7 @@ class BinaryExpression(Expression, BinaryOperationMixin):
         if isinstance(self.left, SQLASTInterface):
             left_sql_ast = self.left.get_sql_ast()
         else:
-            left_sql_ast = ['VALUE', self.left]
+            left_sql_ast = ['VALUE', self.left]  # pragma: no cover
 
         if isinstance(self.right, SQLASTInterface):
             right_sql_ast = self.right.get_sql_ast()

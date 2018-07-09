@@ -13,7 +13,7 @@ from olo.cache import CacheWrapper, delete_cache
 from olo.cached_query import CachedQuery
 from olo.compat import (str_types, iteritems, iterkeys, itervalues, izip,
                         long, reduce, values_list, with_metaclass, xrange)
-from olo.context import Context, model_instantiate_context
+from olo.context import Context, context, model_instantiate_context
 from olo.errors import DeparseError, ExpressionError, InvalidFieldError
 from olo.events import after_delete, after_insert, after_update, before_update
 from olo.expression import BinaryExpression, Expression
@@ -1048,7 +1048,7 @@ class Model(with_metaclass(ModelMeta)):
         values = self.__class__.query(*missing_fields).filter(
             **pk_dict
         ).first()
-        if len(missing_fields) == 1 and values is not None and not isinstance(values, list):
+        if len(missing_fields) == 1 and values is not None and not isinstance(values, list):  # noqa
             values = [values]  # pragma: no cover
         if values:
             self._data.update(
@@ -1218,21 +1218,17 @@ class Model(with_metaclass(ModelMeta)):
 
     @classmethod
     def get_sql_ast(cls):
-        # table_name = cls._get_table_name()
-        # attr_name = '_{}_as_{}_sql_ast'.format(
-        #     table_name, (context.table_alias_mapping or {}).get(table_name)
-        # )
-        # if attr_name not in cls.__dict__:
-        #     sql_ast = ['SERIES'] + list(
-        #         map(lambda x: getattr(cls, x).get_sql_ast(),
-        #             cls.__sorted_fields__)
-        #     )
-        #     setattr(cls, attr_name, sql_ast)
-        # return getattr(cls, attr_name)
-        return ['SERIES'] + list(
-            map(lambda x: getattr(cls, x).get_sql_ast(),
-                cls.__sorted_fields__)
+        table_name = cls._get_table_name()
+        attr_name = '_{}_as_{}_sql_ast'.format(
+            table_name, (context.table_alias_mapping or {}).get(table_name)
         )
+        if attr_name not in cls.__dict__:
+            sql_ast = ['SERIES'] + list(
+                map(lambda x: getattr(cls, x).get_sql_ast(),
+                    cls.__sorted_fields__)
+            )
+            setattr(cls, attr_name, sql_ast)
+        return getattr(cls, attr_name)
 
     @classmethod
     def _parse_attrs(cls, attrs, decrypt=True, output=True):

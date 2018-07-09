@@ -187,15 +187,15 @@ class IF(Function):
         if hasattr(self._test, 'get_sql_ast'):
             test_ast = self._test.get_sql_ast()
         else:
-            test_ast = ['VALUE', self._test]
+            test_ast = ['VALUE', self._test]  # pragma: no cover
 
         if hasattr(self._then, 'get_sql_ast'):
-            then_ast = self._then.get_sql_ast()
+            then_ast = self._then.get_sql_ast()  # pragma: no cover
         else:
             then_ast = ['VALUE', self._then]
 
         if hasattr(self._else, 'get_sql_ast'):
-            else_ast = self._else.get_sql_ast()
+            else_ast = self._else.get_sql_ast()  # pragma: no cover
         else:
             else_ast = ['VALUE', self._else]
 

@@ -211,15 +211,6 @@ class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
     def __init__(self, *args, **kwargs):
         super(Field, self).__init__(*args, **kwargs)
 
-    @property
-    def formatted_name(self):
-        if context.field_verbose and self.table_name:
-            return '`{}`.`{}`'.format(
-                self.table_name,
-                self.name
-            )
-        return '`{}`'.format(self.name)
-
     def alias(self, name):
         inst = self.clone()
         inst._alias_name = name
@@ -245,10 +236,6 @@ class ConstField(Field):
     def __init__(self, value, *args, **kwargs):
         self._value = value
         super(ConstField, self).__init__(type(value), *args, **kwargs)
-
-    @property
-    def formatted_name(self):
-        return repr(self._value)  # pragma: no cover
 
     def get_sql_ast(self):
         return ['VALUE', self._value]

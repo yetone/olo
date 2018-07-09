@@ -191,7 +191,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
                 left[1], operator
             )
             if _cmp < 0:
-                left_sql_piece = '({})'.format(left_sql_piece)
+                left_sql_piece = '({})'.format(left_sql_piece)  # noqa pragma: no cover
         if is_sql_ast(right):
             right_car = car(right)
             if right_car in ops:
@@ -199,7 +199,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
                     right[1], operator
                 )
                 if _cmp < 0:
-                    right_sql_piece = '({})'.format(right_sql_piece)
+                    right_sql_piece = '({})'.format(right_sql_piece)  # noqa pragma: no cover
             elif right_car == 'SELECT':
                 right_sql_piece = '({})'.format(right_sql_piece)
         return (
