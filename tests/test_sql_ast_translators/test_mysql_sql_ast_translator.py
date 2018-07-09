@@ -1,12 +1,59 @@
 from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator  # noqa
-
 from tests.base import TestCase
-
 
 tran = MySQLSQLASTTranslator()
 
 
 class TestMySQLSQLASTTranslator(TestCase):
+    def test_select(self):
+        ast = ['SELECT',
+               ['SERIES',
+                ['COLUMN', 'b', 'name'],
+                ['COLUMN', 'b', 'age'],
+                ['COLUMN', 'f', 'age']],
+               ['FROM',
+                ['JOIN',
+                 ['ALIAS',
+                  ['TABLE', 'bar'],
+                  'b'],
+                 ['ALIAS',
+                  ['TABLE', 'foo'],
+                  'f']]],
+               ['ON',
+                ['BINARY_OPERATE',
+                 '=',
+                 ['COLUMN', 'b', 'age'],
+                 ['COLUMN', 'f', 'age']]],
+               ['WHERE',
+                ['BINARY_OPERATE',
+                 '<',
+                 ['COLUMN', 'b', 'age'],
+                 ['SELECT',
+                  ['SERIES',
+                   ['CALL',
+                    'MAX',
+                    ['COLUMN', 'f', 'id']]],
+                  ['FROM',
+                   ['ALIAS',
+                    ['TABLE', 'foo'],
+                    'f']]]]],
+               ['GROUP BY',
+                ['SERIES',
+                 ['COLUMN', 'b', 'age']]],
+               ['ORDER BY',
+                ['SERIES',
+                 ['UNARY_OPERATE',
+                  ['COLUMN', 'b', 'age'],
+                  'DESC']]],
+               ['LIMIT',
+                ['VALUE', 20],
+                ['VALUE', 10]]]
+        self.assertEqual(
+            tran.translate(ast),
+            ('SELECT `b`.`name`, `b`.`age`, `f`.`age` FROM `bar` AS b JOIN `foo` AS f ON `b`.`age` = `f`.`age` WHERE `b`.`age` < (SELECT MAX(`f`.`id`) FROM `foo` AS f) GROUP BY `b`.`age` ORDER BY `b`.`age` DESC LIMIT %s, %s',  # noqa
+             [20, 10])
+        )
+
     def test_or(self):
         self.assertEqual(
             tran.translate([
