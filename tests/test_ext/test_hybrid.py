@@ -1,6 +1,7 @@
 from olo.ext.hybrid import hybrid_property
-
-from tests.base import TestCase, Foo as _Foo, Dummy as _Dummy
+from tests.base import Dummy as _Dummy
+from tests.base import Foo as _Foo
+from tests.base import TestCase
 from tests.utils import patched_execute
 
 
@@ -39,12 +40,30 @@ class TestHybrid(TestCase):
                 return self.age - self.id
 
         q = Foo.query.filter(Foo.new_age > 2)
-        sql, params = q.get_sql_and_params()
+        sql_ast = q.get_sql_ast()
         self.assertEqual(
-            'SELECT `id`, `name`, `age`, `age_str`, `key` FROM `foo` WHERE `age` - `id` > %s ',  # noqa
-            sql
+            sql_ast,
+            ['SELECT',
+             ['SERIES',
+              ['COLUMN', 'f', 'id'],
+              ['COLUMN', 'f', 'name'],
+              ['COLUMN', 'f', 'age'],
+              ['COLUMN', 'f', 'age_str'],
+              ['COLUMN', 'f', 'key']
+              ],
+             ['FROM',
+              ['ALIAS',
+               ['TABLE', 'foo'],
+               'f']],
+             ['WHERE',
+              ['BINARY_OPERATE',
+               '>',
+               ['BINARY_OPERATE',
+                '-',
+                ['COLUMN', 'f', 'age'],
+                ['COLUMN', 'f', 'id']],
+               ['VALUE', 2]]]]
         )
-        self.assertEqual(params, [2])
         Foo.create(age=3)
         foo = Foo.query.filter(Foo.new_age == 2).first()
         self.assertEqual(foo.new_age, 2)

@@ -1,13 +1,11 @@
 import json
 from datetime import datetime
 
-from olo.funcs import COUNT, DISTINCT, SUM, AVG
 from olo.errors import ExpressionError, SupportError
-from olo.context import field_verbose_context
+from olo.funcs import AVG, COUNT, DISTINCT, SUM
 from olo.utils import missing
 
-from .base import TestCase, Dummy, Foo
-
+from .base import Dummy, Foo, TestCase
 
 attrs = dict(
     name='foo',
@@ -217,26 +215,46 @@ class TestQuery(TestCase):
             Dummy.query.delete()
 
     def test_expression(self):
-        with field_verbose_context(True):
-            Dummy.create(name='foo0', age=3)
-            q = Dummy.query.filter(name='foo0')
-            expression, params = q._get_expression_and_params()
-            self.assertEqual(expression, '`dummy`.`name` = %s')
-            self.assertEqual(params, ['foo0'])
-            expression, params = q._get_expression_and_params()
-            self.assertEqual(expression, '`dummy`.`name` = %s')
-            self.assertEqual(params, ['foo0'])
-            _q = q.filter(age=3)
-            expression, params = _q._get_expression_and_params()
-            self.assertEqual(expression, '`dummy`.`name` = %s AND `dummy`.`age` = %s')  # noqa
-            self.assertEqual(params, ['foo0', 3])
-            expression, params = q._get_expression_and_params()
-            self.assertEqual(expression, '`dummy`.`name` = %s')
-            self.assertEqual(params, ['foo0'])
-            q = Dummy.query.filter(name=missing, id=1)
-            expression, params = q._get_expression_and_params()
-            self.assertEqual(expression, '`dummy`.`id` = %s')
-            self.assertEqual(params, [1])
+        Dummy.create(name='foo0', age=3)
+        q = Dummy.query.filter(name='foo0')
+        ast = q._get_expression().get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '=',
+            ['COLUMN', 'dummy', 'name'],
+            ['VALUE', 'foo0']
+        ])
+        _q = q.filter(age=3)
+        ast = _q._get_expression().get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'AND',
+            ['BINARY_OPERATE',
+             '=',
+             ['COLUMN', 'dummy', 'name'],
+             ['VALUE', 'foo0']
+             ],
+            ['BINARY_OPERATE',
+             '=',
+             ['COLUMN', 'dummy', 'age'],
+             ['VALUE', 3]
+             ]
+        ])
+        ast = q._get_expression().get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '=',
+            ['COLUMN', 'dummy', 'name'],
+            ['VALUE', 'foo0']
+        ])
+        q = Dummy.query.filter(name=missing, id=1)
+        ast = q._get_expression().get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '=',
+            ['COLUMN', 'dummy', 'id'],
+            ['VALUE', 1]
+        ])
 
     def test_join(self):
         Dummy.create(name='dummy0', age=3)

@@ -7,9 +7,9 @@ from .base import TestCase, Foo, Bar
 
 class TestASTAPI(TestCase):
     def is_same_q(self, q1, q2):
-        sql1, _ = q1.get_sql_and_params()
-        sql2, _ = q2.get_sql_and_params()
-        self.assertEqual(sql1, sql2)
+        ast1 = q1.get_sql_ast()
+        ast2 = q2.get_sql_ast()
+        self.assertEqual(ast1, ast2)
 
     def test_no_condition(self):
         q1 = select(f for f in Foo)
@@ -44,7 +44,7 @@ class TestASTAPI(TestCase):
             if f.id == 1 and f.age in [1, 2] or f.name == 'a'
         )
         q2 = Foo.query.filter(
-            (Foo.id == 1) & (Foo.age.in_([1, 2])) | (
+            (Foo.id == 1) & (Foo.age.in_((1, 2))) | (
                 Foo.name == 'a'
             )
         )
@@ -57,7 +57,7 @@ class TestASTAPI(TestCase):
             if f.id == b.age and f.age in [1, 2] or b.name == 'a'
         )
         q2 = Foo.query.join(Bar).filter(
-            (Foo.id == Bar.age) & (Foo.age.in_([1, 2])) | (
+            (Foo.id == Bar.age) & (Foo.age.in_((1, 2))) | (
                 Bar.name == 'a'
             )
         )

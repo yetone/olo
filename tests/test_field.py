@@ -49,103 +49,210 @@ class TestField(TestCase):
 
     def test_sub(self):
         exp = Foo.age - 1
-        sql, _ = exp.get_sql_and_params()
-        self.assertEqual(sql, '`age` - %s')
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '-',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_mul(self):
         exp = Foo.age * 1
-        sql, _ = exp.get_sql_and_params()
-        self.assertEqual(sql, '`age` * %s')
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '*',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_div(self):
-        x = Foo.age / 2
-        sql, _ = x.get_sql_and_params()
-        self.assertEqual(sql, '`age` / %s')
+        exp = Foo.age / 2
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '/',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 2]
+        ])
 
     def test_mod(self):
-        x = Foo.age % 1
-        sql, _ = x.get_sql_and_params()
-        self.assertEqual(sql, '`age` % %s')
+        exp = Foo.age % 1
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '%',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_eq(self):
-        v = Foo.age == 1
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` = %s')
-        v = Foo.age == None  # noqa
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` IS %s')
+        exp = Foo.age == 1
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '=',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
+        exp = Foo.age == None  # noqa
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'IS',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', None]
+        ])
 
     def test_ne(self):
-        v = Foo.age != 1
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` != %s')
-        v = Foo.age != None  # noqa
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` IS NOT %s')
+        exp = Foo.age != 1
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '!=',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
+        exp = Foo.age != None  # noqa
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'IS NOT',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', None]
+        ])
 
     def test_gt(self):
-        v = Foo.age > 1
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` > %s')
+        exp = Foo.age > 1
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '>',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_ge(self):
-        v = Foo.age >= 1
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` >= %s')
+        exp = Foo.age >= 1
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '>=',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_lt(self):
-        v = Foo.age < 1
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` < %s')
+        exp = Foo.age < 1
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '<',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_le(self):
-        v = Foo.age <= 1
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` <= %s')
+        exp = Foo.age <= 1
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '<=',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_not_in_(self):
-        v = Foo.age.not_in_([1])
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` NOT IN %s')
+        exp = Foo.age.not_in_([1])
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'NOT IN',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', [1]]
+        ])
         f = UnionField(Foo.age, Foo.id)
-        v = f.not_in_([1])
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '(`age`, `id`) NOT IN %s')
+        exp = f.not_in_([1])
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'NOT IN',
+            ['BRACKET',
+             ['COLUMN', 'foo', 'age'],
+             ['COLUMN', 'foo', 'id']],
+            ['VALUE', [1]]
+        ])
 
     def test_like_(self):
-        v = Foo.age.like_(1)
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` LIKE %s')
+        exp = Foo.age.like_(1)
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'LIKE',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_ilike_(self):
-        v = Foo.age.ilike_(1)
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` ILIKE %s')
+        exp = Foo.age.ilike_(1)
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'ILIKE',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_regexp_(self):
-        v = Foo.age.regexp_(1)
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` REGEXP %s')
+        exp = Foo.age.regexp_(1)
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'REGEXP',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_between_(self):
-        v = Foo.age.between_(1)
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` BETWEEN %s')
+        exp = Foo.age.between_(1)
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'BETWEEN',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_concat_(self):
-        v = Foo.age.concat_(1)
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` || %s')
+        exp = Foo.age.concat_(1)
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            '||',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_is_(self):
-        v = Foo.age.is_(1)
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` IS %s')
+        exp = Foo.age.is_(1)
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'IS',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_is_not_(self):
-        v = Foo.age.is_not_(1)
-        sql, _ = v.get_sql_and_params()
-        self.assertEqual(sql, '`age` IS NOT %s')
+        exp = Foo.age.is_not_(1)
+        ast = exp.get_sql_ast()
+        self.assertEqual(ast, [
+            'BINARY_OPERATE',
+            'IS NOT',
+            ['COLUMN', 'foo', 'age'],
+            ['VALUE', 1]
+        ])
 
     def test_get_model(self):
         model_ref = Foo.age._model_ref
@@ -175,14 +282,14 @@ class TestConstField(TestCase):
         v = 1
         f = ConstField(v)
         self.assertEqual(
-            f.get_sql_and_params(),
-            ('%s', [v]),
+            f.get_sql_ast(),
+            ['VALUE', v],
         )
         v = 'a'
         f = ConstField(v)
         self.assertEqual(
-            f.get_sql_and_params(),
-            ('%s', [v]),
+            f.get_sql_ast(),
+            ['VALUE', v],
         )
 
 
