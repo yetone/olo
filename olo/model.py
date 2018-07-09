@@ -127,7 +127,7 @@ def _process_key(cls, key):
                     )
                 )
                 return  # pragma: no cover
-            _key.append(item)
+            _key.append(attr_name)
         else:
             raise RuntimeError(  # pragma: no cover
                 '{}\'s key is not support this item: `{}`'.format(
