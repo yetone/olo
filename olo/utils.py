@@ -10,7 +10,7 @@ from ast import literal_eval
 from datetime import datetime, date
 
 from olo.compat import (
-    PY2, Decimal, unicode, iteritems, str_types, items_list,
+    PY2, Decimal, unicode, iteritems, str_types, get_items,
 )
 
 
@@ -97,7 +97,7 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
                 return False
         return True
     elif t is dict:
-        items = items_list(type_)
+        items = get_items(type_)
         if not items:
             return isinstance(obj, t)
         kt, vt = items[0]
@@ -151,7 +151,7 @@ def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
         return [transform_type(e, type_[0]) for e in obj]
     elif isinstance(obj, dict):
         d = {}
-        items = items_list(type_)
+        items = get_items(type_)
         kt, vt = items[0]
         for k, v in iteritems(obj):
             k = transform_type(k, kt)

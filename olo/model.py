@@ -12,7 +12,7 @@ from olo._speedups import decrypt_attrs, parse_attrs
 from olo.cache import CacheWrapper, delete_cache
 from olo.cached_query import CachedQuery
 from olo.compat import (str_types, iteritems, iterkeys, itervalues, izip,
-                        long, reduce, values_list, with_metaclass, xrange)
+                        long, reduce, get_values, with_metaclass, xrange)
 from olo.context import Context, context, model_instantiate_context
 from olo.errors import DeparseError, ExpressionError, InvalidFieldError
 from olo.events import after_delete, after_insert, after_update, before_update
@@ -1090,7 +1090,7 @@ class Model(with_metaclass(ModelMeta)):
             ident = idents[0]
             items = cls._get_multi_by(
                 UnionField(*[getattr(cls, k) for k in ident])
-                .in_([values_list(_ident) for _ident in idents])
+                .in_([get_values(_ident) for _ident in idents])
             )
             mapping = {
                 tuple(

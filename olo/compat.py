@@ -35,10 +35,13 @@ if PY2:
     def itervalues(dict):
         return dict.itervalues()  # pragma: no cover
 
-    def items_list(dict):
+    def get_items(dict):
         return dict.items()
 
-    def values_list(dict):
+    def get_keys(dict):
+        return dict.keys()  # pragma: no cover
+
+    def get_values(dict):
         return dict.values()  # pragma: no cover
 
     def to_str(x, charset='utf8', errors='strict'):
@@ -77,10 +80,13 @@ else:
     def itervalues(dict):  # pragma: no cover
         return iter(dict.values())  # pragma: no cover
 
-    def items_list(dict):  # pragma: no cover
+    def get_items(dict):  # pragma: no cover
         return list(dict.items())  # pragma: no cover
 
-    def values_list(dict):  # pragma: no cover
+    def get_keys(dict):  # pragma: no cover
+        return list(dict.keys())  # pragma: no cover
+
+    def get_values(dict):  # pragma: no cover
         return list(dict.values())  # pragma: no cover
 
     def to_str(x, charset='utf8', errors='strict'):
