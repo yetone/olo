@@ -262,7 +262,7 @@ class Query(SQLASTInterface):
         rv = self._get_rv(base_sql_ast=base_sql_ast,
                           alias_mapping=alias_mapping,
                           cursor=cursor)
-        cursor.execute('SELECT FOUND_ROWS()')
+        cursor.ast_execute(['SELECT', ['CALL', 'FOUND_ROWS']])
         count = cursor.fetchone()[0]
         items = list(self._iter_wrap_rv(rv))
         return count, items
@@ -322,13 +322,11 @@ class Query(SQLASTInterface):
             alias_mapping=alias_mapping,
         )
 
-        sql, params = self.db.ast_translator.translate(sql_ast)
-
         if cursor is not None:
-            cursor.execute(sql, params)
+            cursor.ast_execute(sql_ast)
             return cursor.fetchall()
 
-        return self.db.execute(sql, params)
+        return self.db.ast_execute(sql_ast)
 
     def get_sql_ast(self, base_sql_ast=None, alias_mapping=None):
         sql_ast = self.get_primitive_sql_ast(
@@ -495,7 +493,7 @@ class Query(SQLASTInterface):
         session = QuerySession()
 
         for idx, item in enumerate(rv):
-            new_item = tuple(imap(lambda f: f(item), producers))  # pylint: disable=W
+            new_item = tuple(imap(lambda f: f(item), producers))  # noqa pylint: disable=W
             if entity_count == 1:
                 new_item = new_item[0]
 

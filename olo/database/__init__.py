@@ -80,6 +80,10 @@ class OLOCursor(object):
 
     __repr__ = __str__
 
+    def ast_execute(self, sql_ast, **kwargs):
+        sql, params = self.db.ast_translator.translate(sql_ast)
+        return self.execute(sql, params, **kwargs)
+
     def execute(self, sql, *args, **kwargs):
         if isinstance(self.db, DataBase):
             kwargs['called_from_store'] = kwargs.pop('called_from_store', True)  # noqa pragma: no cover
@@ -323,6 +327,10 @@ class BaseDataBase(object):
 
     def sql_rollback(self):
         raise NotImplementedError
+
+    def ast_execute(self, sql_ast):
+        sql, params = self.ast_translator.translate(sql_ast)
+        return self.execute(sql, params=params)
 
     def execute(self, sql, params=None):
         self.log(sql, params)

@@ -714,10 +714,8 @@ class Model(with_metaclass(ModelMeta)):
                 ['WHERE'] + [expression.get_sql_ast()]
             ]
 
-            sql, params = db.ast_translator.translate(sql_ast)
-
             try:
-                db.execute(sql, params)
+                db.ast_execute(sql_ast)
                 if db.autocommit:
                     db.commit()
             except Exception:
@@ -794,8 +792,7 @@ class Model(with_metaclass(ModelMeta)):
         ]
 
         db = self._get_db()
-        sql, params = db.ast_translator.translate(sql_ast)
-        db.execute(sql, params)
+        db.ast_execute(sql_ast)
 
         def func():
             after_delete.send(self)
@@ -951,10 +948,8 @@ class Model(with_metaclass(ModelMeta)):
                 values_ast
             ]
 
-            sql, params = db.ast_translator.translate(sql_ast)
-
             try:
-                id_ = db.execute(sql, params)
+                id_ = db.ast_execute(sql_ast)
                 if db.autocommit:
                     db.commit()
             except Exception:
