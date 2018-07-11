@@ -13,3 +13,12 @@ class SQLASTTranslator(object):
         if method is None:
             raise NotImplementedError(method_name)
         return method(*tail)  # pylint: disable=not-callable
+
+    def reduce(self, args):
+        params = []
+        sql_pieces = []
+        for x in args:
+            sql_piece, _params = self.translate(x)
+            sql_pieces.append(sql_piece)
+            params.extend(_params)
+        return sql_pieces, params

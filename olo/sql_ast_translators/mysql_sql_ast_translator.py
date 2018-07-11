@@ -1,61 +1,51 @@
+from datetime import datetime, date
+
 from olo.sql_ast_translators.sql_ast_translator import SQLASTTranslator
 from olo.context import context, alias_only_context
 from olo.utils import compare_operator_precedence, is_sql_ast, car
+from olo.compat import (
+    Decimal, long, unicode,
+)
 
 
 class MySQLSQLASTTranslator(SQLASTTranslator):
+    def post_PROGN(self, *args):
+        sql_pieces, params = self.reduce(
+            ['SENTENCE', a] for a in args
+        )
+        return '\n'.join(sql_pieces), params
+
+    def post_SENTENCE(self, ast):
+        sql_piece, params = self.translate(ast)
+        return '{};'.format(sql_piece), params
+
     def post_INSERT(self, *args):
-        params = []
-        sql_pieces = ['INSERT INTO']
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
+        sql_pieces.insert(0, 'INSERT INTO')
         return ' '.join(sql_pieces), params
 
     def post_SELECT(self, *args):
-        params = []
-        sql_pieces = ['SELECT']
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
+        sql_pieces.insert(0, 'SELECT')
         return ' '.join(sql_pieces), params
 
     def post_UPDATE(self, *args):
-        params = []
-        sql_pieces = ['UPDATE']
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
+        sql_pieces.insert(0, 'UPDATE')
         return ' '.join(sql_pieces), params
 
     def post_DELETE(self, *args):
-        params = []
-        sql_pieces = ['DELETE FROM']
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
+        sql_pieces.insert(0, 'DELETE FROM')
         return ' '.join(sql_pieces), params
 
     def post_SET(self, *args):
-        params = []
-        sql_pieces = ['SET']
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
+        sql_pieces.insert(0, 'SET')
         return ' '.join(sql_pieces), params
 
     def post_VALUES(self, *args):
-        params = []
-        sql_pieces = []
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
         return 'VALUES({})'.format(', '.join(sql_pieces)), params
 
     def post_MODIFIER(self, modifier, select_ast):
@@ -63,21 +53,11 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         return '{} {}'.format(modifier, sql_piece), params
 
     def post_BRACKET(self, *args):
-        params = []
-        sql_pieces = []
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
         return '({})'.format(', '.join(sql_pieces)), params
 
     def post_SERIES(self, *args):
-        params = []
-        sql_pieces = []
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
         return ', '.join(sql_pieces), params
 
     def post_COLUMN(self, table_name, field_name):
@@ -129,12 +109,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         return '`{}`'.format(table_name), []
 
     def post_CALL(self, func_name, *args):
-        params = []
-        sql_pieces = []
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
         return (
             '{}({})'.format(
                 func_name, ', '.join(map(str, sql_pieces))
@@ -210,21 +185,11 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         )
 
     def post_AND(self, *args):
-        params = []
-        sql_pieces = []
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
         return ' AND '.join(sql_pieces), params
 
     def post_OR(self, *args):
-        params = []
-        sql_pieces = []
-        for x in args:
-            sql_piece, _params = self.translate(x)
-            sql_pieces.append(sql_piece)
-            params.extend(_params)
+        sql_pieces, params = self.reduce(args)
         return ' OR '.join(sql_pieces), params
 
     def post_IF(self, test_ast, then_ast, else_ast):
@@ -243,3 +208,100 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         sql_pieces.append(else_sql_piece)
         sql_pieces.append('END')
         return ' '.join(sql_pieces), params
+
+    def post_CREATE_TABLE(self, tmp, if_not_exists, tbl_name,
+                          create_definition_ast, tbl_options_ast):
+        sql_piece = 'CREATE '
+        if tmp:
+            sql_piece += 'TEMPORARY '  # pragma: no cover
+        sql_piece += 'TABLE '
+        if if_not_exists:
+            sql_piece += 'IF NOT EXISTS '
+        sql_piece += '`{}` '.format(tbl_name)
+        _sql_piece, params = self.translate(create_definition_ast)
+        sql_piece = sql_piece + '(\n' + _sql_piece + '\n)'
+        _sql_piece, _params = self.translate(tbl_options_ast)
+        params.extend(_params)
+        sql_piece += ' ' + _sql_piece
+        return sql_piece, params
+
+    def post_CREATE_DEFINITION(self, *args):
+        sql_pieces, params = self.reduce(args)
+        return ',\n'.join('  {}'.format(p) for p in sql_pieces), params
+
+    def post_FIELD(self, name, type_,
+                   length, charset, default,
+                   noneable, auto_increment, deparse):
+        # pylint: disable=too-many-statements
+        f_schema = '`{}`'.format(name)
+        f_type = ''
+        if type_ in (int, long):
+            if length is not None:
+                if length < 2:
+                    f_type = 'TINYINT({})'.format(length)  # pragma: no cover
+                elif length < 8:
+                    f_type = 'SMALLINT({})'.format(length)
+                else:
+                    f_type = 'INT({})'.format(length)
+            else:
+                f_type = 'BIGINT'
+        elif type_ in (str, unicode):
+            if length is not None:
+                f_type = 'VARCHAR({})'.format(length)
+            else:
+                f_type = 'TEXT'  # pragma: no cover
+        elif type_ is float:
+            f_type = 'FLOAT'  # pragma: no cover
+        elif type_ is Decimal:
+            f_type = 'DECIMAL'  # pragma: no cover
+        elif type_ is date:
+            f_type = 'DATE'
+        elif type_ is datetime:
+            f_type = 'TIMESTAMP'
+        else:
+            f_type = 'TEXT'
+
+        f_schema += ' ' + f_type
+        if charset is not None:
+            f_schema += ' CHARACTER SET {}'.format(charset)
+        if not noneable:
+            f_schema += ' NOT NULL'
+
+        if f_type not in (
+                'BLOB', 'TEXT', 'GEOMETRY', 'JSON'
+        ):
+            if not callable(default):
+                if default is not None or noneable:
+                    if default is not None:
+                        f_schema += ' DEFAULT \'{}\''.format(
+                            deparse(default)
+                        )
+                    else:
+                        f_schema += ' DEFAULT NULL'
+            elif default == datetime.now:
+                f_schema += ' DEFAULT CURRENT_TIMESTAMP'
+
+        if auto_increment:
+            f_schema += ' AUTO_INCREMENT'
+
+        return f_schema, []
+
+    def post_KEY(self, type_, name, field_names):
+        if type_ == 'PRIMARY':
+            return 'PRIMARY KEY ({})'.format(', '.join(
+                '`{}`'.format(x) for x in field_names
+            )), []
+        if type_ == 'INDEX':
+            return 'INDEX `{}` ({})'.format(
+                name,
+                ', '.join('`{}`'.format(x) for x in field_names)
+            ), []
+        if type_ == 'UNIQUE':
+            return 'UNIQUE KEY `{}` ({})'.format(
+                name,
+                ', '.join('`{}`'.format(x) for x in field_names)
+            ), []
+        raise NotImplementedError('key type: {}'.format(type_))
+
+    def post_TABLE_OPTIONS(self, *options):
+        return ' '.join('{}={}'.format(x[0], x[1]) for x in options), []
