@@ -136,75 +136,31 @@ class MySQLDataBase(BaseDataBase):
         return OLOCursor(cur, self)
 
     @classmethod
-    def to_model_table_schema(cls, model):
+    def to_model_table_schema_sql_ast(cls, model):
         # pylint: disable=too-many-statements
 
-        field_schemas = []
+        ast = ['CREATE_TABLE', False, True, model._get_table_name()]
+
+        create_difinition_ast = ['CREATE_DEFINITION']
         for k in model.__sorted_fields__:
             f = getattr(model, k)
 
-            f_schema = '`{}`'.format(f.name)
+            f_schema_ast = [
+                'FIELD', f.name, f.type, f.length,
+                f.charset, f.default, f.noneable,
+                f.auto_increment, f.deparse
+            ]
 
-            f_type = ''
-            if f.type in (int, long):
-                if f.length is not None:
-                    if f.length < 2:
-                        f_type = 'TINYINT({})'.format(f.length)  # pragma: no cover
-                    elif f.length < 8:
-                        f_type = 'SMALLINT({})'.format(f.length)
-                    else:
-                        f_type = 'INT({})'.format(f.length)
-                else:
-                    f_type = 'INT'
-            elif f.type in (str, unicode):
-                if f.length is not None:
-                    f_type = 'VARCHAR({})'.format(f.length)
-                else:
-                    f_type = 'TEXT'  # pragma: no cover
-            elif f.type is float:
-                f_type = 'FLOAT'  # pragma: no cover
-            elif f.type is Decimal:
-                f_type = 'DECIMAL'  # pragma: no cover
-            elif f.type is date:
-                f_type = 'DATE'
-            elif f.type is datetime:
-                f_type = 'TIMESTAMP'
-            else:
-                f_type = 'TEXT'
+            create_difinition_ast.append(f_schema_ast)
 
-            f_schema += ' ' + f_type
-            if f.charset is not None:
-                f_schema += ' CHARACTER SET {}'.format(f.charset)
-            if not f.noneable:
-                f_schema += ' NOT NULL'
-
-            if f_type not in (
-                    'BLOB', 'TEXT', 'GEOMETRY', 'JSON'
-            ):
-                if not callable(f.default):
-                    if f.default is not None or f.noneable:
-                        if f.default is not None:
-                            f_schema += ' DEFAULT \'{}\''.format(
-                                f.deparse(f.default)
-                            )
-                        else:
-                            f_schema += ' DEFAULT NULL'
-                elif f.default == datetime.now:
-                    f_schema += ' DEFAULT CURRENT_TIMESTAMP'
-
-            if f.auto_increment:
-                f_schema += ' AUTO_INCREMENT'
-
-            field_schemas.append(f_schema)
-
-        field_schemas.append('PRIMARY KEY ({})'.format(', '.join(
-            '`{}`'.format(x) for x in model.__primary_key__
-        )))
+        create_difinition_ast.append([
+            'KEY', 'PRIMARY', None, [
+                x for x in model.__primary_key__
+            ]
+        ])
 
         for key in model.__index_keys__:
-            key_schema = 'INDEX'
             key_name = 'idx_' + '_'.join(map(to_camel_case, key))
-            key_schema += ' `{}`'.format(key_name)
             names = []
             for p in key:
                 f = getattr(model, p)
@@ -214,15 +170,12 @@ class MySQLDataBase(BaseDataBase):
             else:
                 if not names:
                     continue
-                key_schema += ' ({})'.format(
-                    ', '.join('`{}`'.format(x) for x in names)
-                )
-                field_schemas.append(key_schema)
+                create_difinition_ast.append([
+                    'KEY', 'INDEX', key_name, names
+                ])
 
         for key in model.__unique_keys__:
-            key_schema = 'UNIQUE KEY'
             key_name = 'uk_' + '_'.join(map(to_camel_case, key))
-            key_schema += ' `{}`'.format(key_name)
             names = []
             for p in key:
                 f = getattr(model, p)
@@ -232,30 +185,33 @@ class MySQLDataBase(BaseDataBase):
             else:
                 if not names:
                     continue  # pragma: no cover
-                key_schema += ' ({})'.format(
-                    ', '.join('`{}`'.format(x) for x in names)
-                )
-                field_schemas.append(key_schema)
+                create_difinition_ast.append([
+                    'KEY', 'UNIQUE', key_name, names
+                ])
 
-        schema = 'CREATE TABLE IF NOT EXISTS `{}` (\n'.format(
-            model.__table_name__
-        )
-        schema += ',\n'.join('  ' + f for f in field_schemas)
-        schema += '\n)'
+        ast.append(create_difinition_ast)
+
+        table_options_ast = ['TABLE_OPTIONS']
         if model._options.table_engine is not None:
-            schema += ' ENGINE={}'.format(model._options.table_engine)
+            table_options_ast.append(['ENGINE', model._options.table_engine])
         if model._options.table_charset is not None:
-            schema += ' DEFAULT CHARSET={}'.format(
+            table_options_ast.append([
+                'DEFAULT CHARSET',
                 model._options.table_charset
-            )
-        return schema + ';'
+            ])
+
+        ast.append(table_options_ast)
+
+        return ast
 
     def gen_tables_schema(self):
-        schemas = [
-            self.to_model_table_schema(m)
+        asts = [
+            self.to_model_table_schema_sql_ast(m)
             for m in self._models
         ]
-        return '\n\n'.join(schemas)
+        return self.ast_translator.translate([
+            'PROGN'
+        ] + asts)[0]
 
     def sql_execute(self, sql, params=None, **kwargs):  # pylint: disable=W
         cmd = None
