@@ -9,7 +9,9 @@ from olo.transaction import Transaction
 from olo.logger import logger
 from olo.errors import DataBaseError
 from olo.compat import str_types, unicode
-from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator
+from olo.utils import to_camel_case
+from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator  # noqa
+from olo.field import BaseField
 
 
 def need_beansdb(func):
@@ -80,7 +82,7 @@ class OLOCursor(object):
 
     def execute(self, sql, *args, **kwargs):
         if isinstance(self.db, DataBase):
-            kwargs['called_from_store'] = kwargs.pop('called_from_store', True)  # pragma: no cover
+            kwargs['called_from_store'] = kwargs.pop('called_from_store', True)  # noqa pragma: no cover
         r = self.cur.execute(sql, *args, **kwargs)
         params = args[0] if args else None
         if self.db.enable_log:
@@ -191,7 +193,82 @@ class BaseDataBase(object):
         raise NotImplementedError
 
     def gen_tables_schema(self):
-        raise NotImplementedError
+        asts = [
+            self.to_model_table_schema_sql_ast(m)
+            for m in self._models
+        ]
+        return self.ast_translator.translate([
+            'PROGN'
+        ] + asts)[0]
+
+    @classmethod
+    def to_model_table_schema_sql_ast(cls, model):
+        # pylint: disable=too-many-statements
+
+        ast = ['CREATE_TABLE', False, True, model._get_table_name()]
+
+        create_difinition_ast = ['CREATE_DEFINITION']
+        for k in model.__sorted_fields__:
+            f = getattr(model, k)
+
+            f_schema_ast = [
+                'FIELD', f.name, f.type, f.length,
+                f.charset, f.default, f.noneable,
+                f.auto_increment, f.deparse
+            ]
+
+            create_difinition_ast.append(f_schema_ast)
+
+        create_difinition_ast.append([
+            'KEY', 'PRIMARY', None, [
+                x for x in model.__primary_key__
+            ]
+        ])
+
+        for key in model.__index_keys__:
+            key_name = 'idx_' + '_'.join(map(to_camel_case, key))
+            names = []
+            for p in key:
+                f = getattr(model, p)
+                if not isinstance(f, BaseField):
+                    break  # pragma: no cover
+                names.append(f.name)
+            else:
+                if not names:
+                    continue
+                create_difinition_ast.append([
+                    'KEY', 'INDEX', key_name, names
+                ])
+
+        for key in model.__unique_keys__:
+            key_name = 'uk_' + '_'.join(map(to_camel_case, key))
+            names = []
+            for p in key:
+                f = getattr(model, p)
+                if not isinstance(f, BaseField):
+                    break  # pragma: no cover
+                names.append(f.name)
+            else:
+                if not names:
+                    continue  # pragma: no cover
+                create_difinition_ast.append([
+                    'KEY', 'UNIQUE', key_name, names
+                ])
+
+        ast.append(create_difinition_ast)
+
+        table_options_ast = ['TABLE_OPTIONS']
+        if model._options.table_engine is not None:
+            table_options_ast.append(['ENGINE', model._options.table_engine])
+        if model._options.table_charset is not None:
+            table_options_ast.append([
+                'DEFAULT CHARSET',
+                model._options.table_charset
+            ])
+
+        ast.append(table_options_ast)
+
+        return ast
 
     def create_all(self):
         schema = self.gen_tables_schema()

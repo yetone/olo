@@ -1,14 +1,12 @@
 from threading import Timer
-from datetime import date, datetime
 
-from olo.compat import Queue, Empty, long, unicode, Decimal
+from olo.compat import Empty, Queue
 
 from olo.libs.pool import Pool, ConnProxy
 from olo.libs.class_proxy import ClassProxy
 
-from olo.utils import ThreadedObject, parse_execute_sql, to_camel_case
+from olo.utils import ThreadedObject, parse_execute_sql
 from olo.database import BaseDataBase, OLOCursor
-from olo.field import BaseField
 
 
 def get_conn(host, port, user, password, dbname, charset):
@@ -134,84 +132,6 @@ class MySQLDataBase(BaseDataBase):
         conn = self.get_conn()
         cur = conn.cursor()
         return OLOCursor(cur, self)
-
-    @classmethod
-    def to_model_table_schema_sql_ast(cls, model):
-        # pylint: disable=too-many-statements
-
-        ast = ['CREATE_TABLE', False, True, model._get_table_name()]
-
-        create_difinition_ast = ['CREATE_DEFINITION']
-        for k in model.__sorted_fields__:
-            f = getattr(model, k)
-
-            f_schema_ast = [
-                'FIELD', f.name, f.type, f.length,
-                f.charset, f.default, f.noneable,
-                f.auto_increment, f.deparse
-            ]
-
-            create_difinition_ast.append(f_schema_ast)
-
-        create_difinition_ast.append([
-            'KEY', 'PRIMARY', None, [
-                x for x in model.__primary_key__
-            ]
-        ])
-
-        for key in model.__index_keys__:
-            key_name = 'idx_' + '_'.join(map(to_camel_case, key))
-            names = []
-            for p in key:
-                f = getattr(model, p)
-                if not isinstance(f, BaseField):
-                    break  # pragma: no cover
-                names.append(f.name)
-            else:
-                if not names:
-                    continue
-                create_difinition_ast.append([
-                    'KEY', 'INDEX', key_name, names
-                ])
-
-        for key in model.__unique_keys__:
-            key_name = 'uk_' + '_'.join(map(to_camel_case, key))
-            names = []
-            for p in key:
-                f = getattr(model, p)
-                if not isinstance(f, BaseField):
-                    break  # pragma: no cover
-                names.append(f.name)
-            else:
-                if not names:
-                    continue  # pragma: no cover
-                create_difinition_ast.append([
-                    'KEY', 'UNIQUE', key_name, names
-                ])
-
-        ast.append(create_difinition_ast)
-
-        table_options_ast = ['TABLE_OPTIONS']
-        if model._options.table_engine is not None:
-            table_options_ast.append(['ENGINE', model._options.table_engine])
-        if model._options.table_charset is not None:
-            table_options_ast.append([
-                'DEFAULT CHARSET',
-                model._options.table_charset
-            ])
-
-        ast.append(table_options_ast)
-
-        return ast
-
-    def gen_tables_schema(self):
-        asts = [
-            self.to_model_table_schema_sql_ast(m)
-            for m in self._models
-        ]
-        return self.ast_translator.translate([
-            'PROGN'
-        ] + asts)[0]
 
     def sql_execute(self, sql, params=None, **kwargs):  # pylint: disable=W
         cmd = None

@@ -213,7 +213,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
                           create_definition_ast, tbl_options_ast):
         sql_piece = 'CREATE '
         if tmp:
-            sql_piece += 'TEMPORARY '
+            sql_piece += 'TEMPORARY '  # pragma: no cover
         sql_piece += 'TABLE '
         if if_not_exists:
             sql_piece += 'IF NOT EXISTS '
