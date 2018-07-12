@@ -1,5 +1,5 @@
 <p align="center">
-    <img width="100" src="https://rawcdn.githack.com/yetone/figure_bed/master/olo_logo.png" >
+    <img width="160" src="https://rawcdn.githack.com/yetone/figure_bed/master/olo_logo4.png" >
 </p>
 
 # 
