@@ -53,10 +53,6 @@ class CacheWrapper(object):
         )
 
     def _report_miss(self, method_name, *args, **kwargs):
-
-        if random.random() > 0.02:
-            return
-
         level = kwargs.pop('olo_report_level', logging.WARNING)  # pragma: no cover pylint: disable=E
 
         msg = self._build_report_miss_msg(  # pragma: no cover
