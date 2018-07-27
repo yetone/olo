@@ -18,7 +18,7 @@ before_script:
   - mysql -e 'grant all on *.* to travis@localhost'
   - pip install -r requirements.txt
   - pip install -r test-requirements.txt
-  - pip install pylint codecov
+  - pip install pylint==1.9.2 codecov
 
 script:
   - pylint --rcfile=.pylintrc olo

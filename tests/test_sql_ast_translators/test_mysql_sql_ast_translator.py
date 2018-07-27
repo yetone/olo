@@ -93,3 +93,27 @@ class TestMySQLSQLASTTranslator(TestCase):
                 [2, 'a', 'b']
             )
         )
+
+    def test_for_update(self):
+        self.assertEqual(
+            tran.translate([
+                'SELECT',
+                ['SERIES',
+                 ['COLUMN', 'f', 'age']],
+                ['FROM',
+                 ['ALIAS',
+                  ['TABLE', 'foo'],
+                  'f']],
+                ['WHERE',
+                 ['BINARY_OPERATE',
+                  '>',
+                  ['COLUMN', 'f', 'age'],
+                  ['VALUE', 2]],
+                 ],
+                ['FOR UPDATE']
+            ]),
+            (
+                'SELECT `f`.`age` FROM `foo` AS f WHERE `f`.`age` > %s FOR UPDATE',
+                [2]
+            )
+        )

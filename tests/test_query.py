@@ -324,6 +324,22 @@ class TestQuery(TestCase):
              ]
         )
 
+    def test_for_update(self):
+        q = Dummy.query(Dummy.id).for_update()
+        self.assertEqual(
+            q.get_sql_ast(),
+            ['SELECT',
+             ['SERIES',
+              ['COLUMN', 'd', 'id']],
+             ['FROM',
+              ['ALIAS',
+               ['TABLE', 'dummy'],
+               'd'],
+              ],
+             ['FOR UPDATE']
+             ]
+        )
+
     def test_order_by(self):
         Dummy.create(name='foo0', age=3)
         Dummy.create(name='foo2', age=6)
