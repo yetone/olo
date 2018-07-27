@@ -103,6 +103,7 @@ class Query(SQLASTInterface):
         self._join = None
         self._left_join = None
         self._right_join = None
+        self._for_update = False
 
     def _update(self, **kwargs):
         inst = self.__class__(self._model_class)
@@ -221,6 +222,9 @@ class Query(SQLASTInterface):
             )
         )
         return self._update(_having_expressions=having_expressions)
+
+    def for_update(self):
+        return self._update(_for_update=True)
 
     def offset(self, offset):
         return self._update(_offset=offset)
@@ -380,6 +384,9 @@ class Query(SQLASTInterface):
                 limit_section[1] = ['VALUE', self._offset]
 
             sql_ast.append(limit_section)
+
+        if self._for_update:
+            sql_ast.append(['FOR UPDATE'])
 
         return sql_ast
 

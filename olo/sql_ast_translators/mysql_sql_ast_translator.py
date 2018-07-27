@@ -305,3 +305,6 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
 
     def post_TABLE_OPTIONS(self, *options):
         return ' '.join('{}={}'.format(x[0], x[1]) for x in options), []
+
+    def post_FOR_UPDATE(self):
+        return 'FOR UPDATE', []
