@@ -3,9 +3,10 @@
 import random
 import base64
 from Crypto.Cipher import AES
-from olo.compat import str_types, to_str, unicode, xrange
+from olo.compat import str_types, to_str, to_bytes, xrange
 
 BS = AES.block_size
+MODE = AES.MODE_ECB
 
 
 def pad(s):
@@ -19,22 +20,18 @@ def unpad(s):
 
 
 def encrypt(plain_text, key):
-    cipher = AES.new(key)
+    cipher = AES.new(to_bytes(key), MODE)
     if not isinstance(plain_text, str_types + (int,)):
         return plain_text
-    plain_text = to_str(plain_text)
-    encrypted = cipher.encrypt(pad(plain_text))
-    return base64.b64encode(encrypted)
+    encrypted = cipher.encrypt(to_bytes(pad(plain_text)))
+    return to_str(base64.b64encode(encrypted))
 
 
 def decrypt(cipher_text, key):
-    cipher = AES.new(key)
+    cipher = AES.new(to_bytes(key), MODE)
     if not (cipher_text and isinstance(cipher_text, str_types + (int,))):
         return cipher_text
-    if isinstance(cipher_text, unicode):
-        cipher_text = cipher_text.encode('utf-8')
-    else:
-        cipher_text = str(cipher_text)
+    cipher_text = to_bytes(cipher_text)
     decrypted = base64.b64decode(cipher_text)
     result = unpad(cipher.decrypt(decrypted))
     return result
