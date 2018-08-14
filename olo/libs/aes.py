@@ -2,7 +2,7 @@
 
 import random
 import base64
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 from olo.compat import str_types, to_str, to_bytes, xrange
 
 BS = AES.block_size
