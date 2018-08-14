@@ -1,5 +1,5 @@
 blinker==1.4
-pycryptodome==3.6.5
+pycryptodomex==3.6.5
 dill==0.2.5
 dateparser==0.3.5
 futures==3.0.5
