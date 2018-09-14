@@ -1,10 +1,22 @@
-class Transaction(object):
+import threading
+
+
+class Transaction(threading.local):
     def __init__(self, db):
+        super(Transaction, self).__init__()
         self._db = db
         self._canceled = False
+        self._curs = set()
+        self.conn = None
 
     def _begin(self):
         self._db.begin()
+
+    def get_curs(self):
+        return self._curs
+
+    def add_cur(self, cur):
+        self._curs.add(cur)
 
     def cancel(self):
         self._canceled = True
@@ -35,9 +47,15 @@ class Transaction(object):
             elif depth == 1:
                 try:
                     self.commit(False)
-                except:
+                except:  # noqa
                     self.rollback(False)
                     raise
         finally:
             self._db.autocommit = self._orig_autocommit
             self._db.pop_transaction()
+
+            while len(self._curs) != 0:
+                self._curs.pop()
+
+            if self.conn is not None:
+                self.conn.release()

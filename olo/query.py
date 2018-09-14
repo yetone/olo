@@ -262,12 +262,13 @@ class Query(SQLASTInterface):
         base_sql_ast, alias_mapping = self._get_base_sql_ast(
             modifier='SQL_CALC_FOUND_ROWS'
         )
-        cursor = self.db.get_cursor()
-        rv = self._get_rv(base_sql_ast=base_sql_ast,
-                          alias_mapping=alias_mapping,
-                          cursor=cursor)
-        cursor.ast_execute(['SELECT', ['CALL', 'FOUND_ROWS']])
-        count = cursor.fetchone()[0]
+        with self.db.transaction():
+            cursor = self.db.get_cursor()
+            rv = self._get_rv(base_sql_ast=base_sql_ast,
+                              alias_mapping=alias_mapping,
+                              cursor=cursor)
+            cursor.ast_execute(['SELECT', ['CALL', 'FOUND_ROWS']])
+            count = cursor.fetchone()[0]
         items = list(self._iter_wrap_rv(rv))
         return count, items
 
@@ -286,9 +287,8 @@ class Query(SQLASTInterface):
             ['SET',
              ['SERIES'] + [exp.get_sql_ast() for exp in expressions]]
         ]
-        rows = self._get_rv(base_sql_ast=sql_ast)
-        if self.db.autocommit:
-            self.db.commit()
+        with self.db.transaction():
+            rows = self._get_rv(base_sql_ast=sql_ast)
         return rows
 
     def delete(self):
@@ -300,9 +300,8 @@ class Query(SQLASTInterface):
             'DELETE',
             ['TABLE', self.table_name]
         ]
-        rows = self._get_rv(base_sql_ast=sql_ast)
-        if self.db.autocommit:
-            self.db.commit()
+        with self.db.transaction():
+            rows = self._get_rv(base_sql_ast=sql_ast)
         return rows
 
     @property
@@ -330,7 +329,8 @@ class Query(SQLASTInterface):
             cursor.ast_execute(sql_ast)
             return cursor.fetchall()
 
-        return self.db.ast_execute(sql_ast)
+        with self.db.transaction():
+            return self.db.ast_execute(sql_ast)
 
     def get_sql_ast(self, base_sql_ast=None, alias_mapping=None):
         sql_ast = self.get_primitive_sql_ast(

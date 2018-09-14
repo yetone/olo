@@ -1,9 +1,8 @@
 # pylint: disable=E0213
 
 import types
-import inspect
 
-from olo.compat import izip
+from olo.compat import izip, iteritems
 from olo.libs.decompiling import decompile
 from olo.libs.compiler.translators.ast_translator import (
     priority, PythonTranslator
@@ -11,6 +10,7 @@ from olo.libs.compiler.translators.ast_translator import (
 from olo.libs.compiler.eval import eval_src
 from olo.libs.compiler import ast
 from olo.libs.compiler.prelude_names import PL_TRANS_FUNC
+from olo.utils import getargspec
 
 
 CK_TRANS_RES = '_olo_func_trans'
@@ -94,20 +94,16 @@ def transform_func(func):
     ast, _, _ = decompile(func)
     FuncTranslator(ast)
 
-    argspec = inspect.getargspec(func)
+    argspec = getargspec(func)
     args = argspec.args
-    defaults = argspec.defaults or []
-    l = len(defaults)
-    if l != 0:
-        args = args[: -l]
-        defaults = zip(argspec.args[-l:], defaults)
+    defaults = argspec.defaults
     varargs = argspec.varargs
-    keywords = argspec.keywords
+    keywords = argspec.varkw
     arg_str = ', '.join(filter(None, [
         ', '.join(args),
         ', '.join(
             '{}={}'.format(k, repr(v))
-            for k, v in defaults
+            for k, v in iteritems(defaults)
         ),
         '*%s' % varargs if varargs else '',
         '**%s' % keywords if keywords else '',

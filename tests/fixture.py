@@ -12,6 +12,9 @@ from tests.libs.beansdb import BeansDBProxy
 from olo.compat import PY2
 
 
+MAX_CONN = 103
+
+
 in_travis = os.environ.get('ENV') == 'travis'
 
 
@@ -81,7 +84,8 @@ def setup_mysql_conn():
 
 def rollback_all():
     from tests.base import db
-    db.rollback()
+    with db.transaction():
+        db.rollback()
     db.pool.clear_conns()
     mysql_conn.rollback()
 
@@ -199,6 +203,12 @@ class TestCase(unittest.TestCase):
     def tearDown(self):
         self.__teardown_mysql()
         self.__teardown_stubs()
+
+        from olo.libs.pool import ConnProxy
+        self.assertLessEqual(
+            ConnProxy.pid, MAX_CONN,
+            'db connection count must less equal than {}'.format(MAX_CONN)
+        )
 
     def __teardown_mysql(self):
         rollback_all()
