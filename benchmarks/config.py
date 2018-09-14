@@ -1,7 +1,9 @@
+import os
+
 MYSQL_HOST = 'localhost'
 MYSQL_PORT = 3306
-MYSQL_USER = 'root'
-MYSQL_PASSWORD = '123'
+MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', 'root')
 MYSQL_DB = 'test_olo'
 MYSQL_CHARSET = 'utf8mb4'
 
@@ -16,7 +18,7 @@ mysql_cfg = dict(
 
 
 def get_mysql_conn():
-    from MySQLdb import connect
+    from pymysql import connect
     return connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
