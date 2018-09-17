@@ -7,6 +7,11 @@ from sqlalchemy_models import (
     session
 )
 
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 if __name__ == '__main__':
     n = 100

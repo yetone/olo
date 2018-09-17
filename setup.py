@@ -1,4 +1,11 @@
+import logging
 from setuptools import setup, find_packages, Extension
+
+
+logger = logging.getLogger()
+if not logger.handlers:
+    logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
 
 setup_kwargs = {}
 
@@ -22,7 +29,7 @@ try:
         cmdclass={'build_ext': build_ext},
     ))
 except ImportError:
-    pass
+    logger.warn('No cython for optimize!!!')
 
 install_requires = []
 for line in open('requirements.txt', 'r'):
