@@ -4,6 +4,8 @@
 
 # 
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/31d592f909fd404e991514822cec824e)](https://app.codacy.com/app/yetone/olo?utm_source=github.com&utm_medium=referral&utm_content=yetone/olo&utm_campaign=Badge_Grade_Dashboard)
+
 <p align="center">
     <a href="https://travis-ci.org/yetone/olo">
         <img alt="Build Status" src="https://travis-ci.org/yetone/olo.svg?branch=master">
