@@ -78,8 +78,7 @@ def get_globals_and_locals(args, kwargs, frame_depth, from_generator=False):
         else:
             locals = {}
         if isinstance(func, types.GeneratorType):
-            locals = locals.copy()
-            locals.update(func.gi_frame.f_locals)
+            locals = dict(locals, **func.gi_frame.f_locals)
         if len(args) > 3:
             throw(
                 TypeError,
@@ -94,6 +93,8 @@ def get_globals_and_locals(args, kwargs, frame_depth, from_generator=False):
         if isinstance(func, types.GeneratorType):
             globals = func.gi_frame.f_globals
             locals.update(func.gi_frame.f_locals)
+        elif isinstance(func, types.FunctionType):
+            globals = dict(func.__globals__)
         else:
             globals = frame.f_globals
     if kwargs:

@@ -1,4 +1,5 @@
 import re
+import types
 
 from olo.libs.compiler.eval import eval_src
 from olo.libs.compiler.utils import get_globals_and_locals
@@ -55,8 +56,10 @@ def select_(*args):
 
 
 def select(*args):
+    assert len(args) > 0, 'select take at least one argument!'
     gen, globals, locals = get_globals_and_locals(
-        args, kwargs=None, frame_depth=3, from_generator=True)
+        args, kwargs=None, frame_depth=3,
+        from_generator=isinstance(args[0], types.GeneratorType))
     tree, external_names, cells = decompile(gen)
     scope = dict(globals)
     scope.update(locals)
