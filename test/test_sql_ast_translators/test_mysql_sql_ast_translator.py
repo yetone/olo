@@ -1,5 +1,5 @@
 from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator  # noqa
-from tests.base import TestCase
+from test.base import TestCase
 
 tran = MySQLSQLASTTranslator()
 

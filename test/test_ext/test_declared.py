@@ -1,7 +1,7 @@
 from olo import Field, DbField
 from olo.ext.declared import declared_attr
 
-from tests.base import TestCase, BaseModel, Foo as _Foo
+from test.base import TestCase, BaseModel, Foo as _Foo
 
 
 class TestDeclared(TestCase):

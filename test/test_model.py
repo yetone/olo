@@ -484,28 +484,28 @@ class TestModel(TestCase):
 
     def test_after_update(self):
         dummy = Dummy.create(**attrs)
-        with patch('tests.base.after_update') as after_update:
+        with patch('test.base.after_update') as after_update:
             dummy.name = 'bar'
             dummy.save()
             self.assertTrue(after_update.called)
-        with patch('tests.base.after_update') as after_update:
+        with patch('test.base.after_update') as after_update:
             dummy.payload = {}
             dummy.save()
             self.assertTrue(after_update.called)
-        with patch('tests.base.after_update') as after_update:
+        with patch('test.base.after_update') as after_update:
             dummy.update(prop1=['a'])
             dummy.save()
             self.assertTrue(after_update.called)
-        with patch('tests.base.after_update') as after_update:
+        with patch('test.base.after_update') as after_update:
             dummy.prop1 = ['b']
             dummy.save()
             self.assertTrue(after_update.called)
-        with patch('tests.base.after_update') as after_update:
+        with patch('test.base.after_update') as after_update:
             with db.transaction():
                 dummy.name = 'bar0'
                 dummy.save()
             self.assertTrue(after_update.called)
-        with patch('tests.base.after_update') as after_update:
+        with patch('test.base.after_update') as after_update:
             try:
                 with db.transaction():
                     dummy.name = 'bar0'
@@ -516,14 +516,14 @@ class TestModel(TestCase):
             self.assertFalse(after_update.called)
 
     def test_after_create(self):
-        with patch('tests.base.after_create') as after_create:
+        with patch('test.base.after_create') as after_create:
             Dummy.create(**attrs)
             self.assertTrue(after_create.called)
-        with patch('tests.base.after_create') as after_create:
+        with patch('test.base.after_create') as after_create:
             with db.transaction():
                 Dummy.create(**attrs)
             self.assertTrue(after_create.called)
-        with patch('tests.base.after_create') as after_create:
+        with patch('test.base.after_create') as after_create:
             try:
                 with db.transaction():
                     Dummy.create(**attrs)
