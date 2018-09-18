@@ -1,3 +1,5 @@
+#!/bin/bash
+
 rm -rf ./test-reports
 rm -rf ./coverage-reports
 mkdir -p ./test-reports
