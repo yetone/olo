@@ -308,13 +308,10 @@ class BaseDataBase(object):
             try:
                 return json.dumps(x)
             except Exception:
-                return '<UNKOWN>'
+                return '<UNKNOWN>'
 
-        try:
-            msg = '[BEANSDB]: {} {}'.format(cmd, ' '.join(map(mapper, args)))
-            logger.log(msg=msg, level=level)
-        except Exception:  # pragma: no cover
-            pass  # pragma: no cover
+        msg = '[BEANSDB]: {} {}'.format(cmd, ' '.join(map(mapper, args)))
+        logger.log(msg=msg, level=level)
 
     @property
     def autocommit(self):
