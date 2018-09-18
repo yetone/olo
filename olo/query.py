@@ -431,7 +431,7 @@ class Query(SQLASTInterface):
             rev_alias_mapping=rev_alias_mapping
         )
 
-        alias_mapping = {v: k for k, v in iteritems(rev_alias_mapping)}
+        alias_mapping = {v: k for k, v in sorted(iteritems(rev_alias_mapping))}
 
         with table_alias_mapping_context(alias_mapping):
             select_ast = [
