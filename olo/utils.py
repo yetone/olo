@@ -2,15 +2,20 @@ from __future__ import absolute_import
 
 import re
 import json
+import inspect
 import threading
 import dateparser
+import logging
+from string import Formatter
 from warnings import warn
 from functools import wraps
 from ast import literal_eval
 from datetime import datetime, date
+from collections import OrderedDict
 
 from olo.compat import (
     PY2, Decimal, unicode, iteritems, str_types, get_items,
+    izip,
 )
 
 
@@ -395,3 +400,81 @@ def is_sql_ast(lst):
     if not isinstance(lst[0], str_types):
         return False  # pragma: no cover
     return lst[0].upper() == lst[0]
+
+
+def to_str(cls):
+    if '__str__' in cls.__dict__:
+        return cls  # pragma: no cover
+
+    def __str__(self):
+        return '{}({})'.format(  # pragma: no cover
+            self.__class__.__name__,
+            ', '.join(
+                '{}={}'.format(k, friendly_repr(v))
+                for k, v in iteritems(self.__dict__)
+            )
+        )
+    cls.__str__ = __str__
+    if '__repr__' not in cls.__dict__:
+        cls.__repr__ = cls.__str__
+    return cls
+
+
+@to_str
+class ArgSpec(object):
+    def __init__(self, argspec):
+        self.varargs = argspec.varargs
+        if hasattr(argspec, 'varkw'):
+            self.varkw = argspec.varkw  # pragma: no cover
+            self.kwonlyargs = OrderedDict(  # pragma: no cover
+                (k, argspec.kwonlydefaults.get(k))
+                for k in argspec.kwonlyargs
+            )
+        else:
+            self.varkw = argspec.keywords  # pragma: no cover
+            self.kwonlyargs = OrderedDict()  # pragma: no cover
+        args = argspec.args
+        defaults = argspec.defaults or []
+        dl = len(defaults)
+        if dl != 0:
+            args = args[: -dl]  # pragma: no cover
+            defaults = zip(argspec.args[-dl:], defaults)  # pragma: no cover
+        self.args = args
+        self.defaults = OrderedDict(defaults)
+
+
+def getargspec(func):
+    if hasattr(inspect, 'getfullargspec'):
+        argspec = inspect.getfullargspec(func)  # pragma: no cover
+    else:
+        argspec = inspect.getargspec(func)  # pragma: no cover
+    return ArgSpec(argspec)
+
+
+def log_call(fmt, logger, level=logging.INFO,
+             toggle=lambda *args, **kwargs: True):
+
+    keys = {x[1] for x in Formatter().parse(fmt)}
+
+    def _(func):
+        argspec = getargspec(func)
+
+        @wraps(func)
+        def __(*args, **kwargs):
+            ret = func(*args, **kwargs)
+
+            if not toggle(*args, **kwargs):
+                return ret  # pragma: no cover
+
+            vals = dict(argspec.defaults)
+            vals.update(dict(izip(argspec.args, args)))
+            vals.update(kwargs)
+            vals['%ret'] = ret
+            vals = {k: v for k, v in iteritems(vals) if k in keys}
+            str_ = fmt.format(**vals)
+            logger.log(level, str_)
+            return ret
+
+        return __
+
+    return _

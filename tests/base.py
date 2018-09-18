@@ -23,6 +23,7 @@ db = MySQLDataBase(
     charset=MYSQL_CHARSET,
     beansdb=beansdb
 )
+db.pool.enable_log = True
 
 
 class _BaseModel(Model):

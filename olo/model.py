@@ -714,14 +714,8 @@ class Model(with_metaclass(ModelMeta)):
                 ['WHERE'] + [expression.get_sql_ast()]
             ]
 
-            try:
+            with db.transaction():
                 db.ast_execute(sql_ast)
-                if db.autocommit:
-                    db.commit()
-            except Exception:
-                if db.autocommit:
-                    db.rollback()  # pragma: no cover
-                raise
 
             dynamic_exps = [
                 exp for exp in expressions if isinstance(exp.right, Expression)
@@ -792,16 +786,13 @@ class Model(with_metaclass(ModelMeta)):
         ]
 
         db = self._get_db()
-        db.ast_execute(sql_ast)
 
         def func():
             after_delete.send(self)
             self.after_delete(**kwargs)
 
-        if db.autocommit:
-            db.commit()
-            func()
-        else:
+        with db.transaction():
+            db.ast_execute(sql_ast)
             db.add_lazy_func(func)
 
         return True
@@ -948,14 +939,8 @@ class Model(with_metaclass(ModelMeta)):
                 values_ast
             ]
 
-            try:
+            with db.transaction():
                 id_ = db.ast_execute(sql_ast)
-                if db.autocommit:
-                    db.commit()
-            except Exception:
-                if db.autocommit:
-                    db.rollback()  # pragma: no cover
-                raise
 
             pk_name = self.get_singleness_pk_name()
 

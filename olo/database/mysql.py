@@ -9,7 +9,7 @@ from olo.utils import ThreadedObject, parse_execute_sql
 from olo.database import BaseDataBase, OLOCursor
 
 
-def get_conn(host, port, user, password, dbname, charset):
+def create_conn(host, port, user, password, dbname, charset):
     try:
         from MySQLdb import connect
         conn = connect(  # pragma: no cover
@@ -120,16 +120,22 @@ class MySQLDataBase(BaseDataBase):
             autocommit=autocommit,
             report=report
         )
-        self.pool = Pool(lambda: get_conn(
+        self.pool = Pool(lambda: create_conn(
             host, port, user, password, dbname, charset
         ), conn_proxy_cls=MySQLConnProxy)
         self.modified_cursors = ThreadedObject(Queue)
 
     def get_conn(self):
-        return self.pool.get_conn()
+        return self.pool.acquire_conn()
 
     def get_cursor(self):  # pylint: disable=W
-        conn = self.get_conn()
+        assert self.in_transaction(), 'db.get_cursor must in transaction!'
+
+        tran = self.get_last_transaction()
+        conn = tran.conn
+        if conn is None:
+            conn = tran.conn = self.get_conn()
+
         cur = conn.cursor()
         return OLOCursor(cur, self)
 
@@ -154,11 +160,15 @@ class MySQLDataBase(BaseDataBase):
 
     def sql_commit(self):
         first_err = None
+        commited = set()
         while not self.modified_cursors.empty():
             try:
                 cur = self.modified_cursors.get_nowait()
                 try:
-                    cur.conn.commit()
+                    if cur.conn not in commited:
+                        commited.add(cur.conn)
+                        cur.conn.commit()
+                        self.log('COMMIT')
                     cur.is_modified = False
                 except Exception as e:  # pragma: no cover pylint: disable=W
                     if first_err is None:  # pragma: no cover
@@ -170,11 +180,15 @@ class MySQLDataBase(BaseDataBase):
 
     def sql_rollback(self):
         first_err = None
+        rollbacked = set()
         while not self.modified_cursors.empty():
             try:
                 cur = self.modified_cursors.get_nowait()
                 try:
-                    cur.conn.rollback()
+                    if cur.conn not in rollbacked:
+                        rollbacked.add(cur.conn)
+                        cur.conn.rollback()
+                        self.log('ROLLBACK')
                     cur.is_modified = False
                 except Exception as e:  # pragma: no cover pylint: disable=W
                     if first_err is None:  # pragma: no cover

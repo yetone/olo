@@ -8,6 +8,25 @@ from .base import TestCase, db as store, beansdb
 from .utils import AE
 
 
+class Transaction(object):
+    def __init__(self, db):
+        self.db_t = db.transaction()
+        self.store_t = db.store.transaction()
+
+    def __enter__(self):
+        self.db_t.__enter__()
+        self.store_t.__enter__()
+        return self
+
+    def __exit__(self, *exc):
+        self.db_t.__exit__(*exc)
+        self.store_t.__exit__(*exc)
+
+
+def start_transaction(db):
+    return Transaction(db)
+
+
 class TestDataBase(TestCase):
     def test_db_get(self):
         db = DataBase(store)
@@ -48,14 +67,14 @@ class TestDataBase(TestCase):
 
     def test_do_beansdb_commands(self):
         db = DataBase(store)
-        with db.transaction():
+        with start_transaction(db):
             with self.assertRaises(DataBaseError):
                 db.db_set('a', 'xixi')
         db = DataBase(store, beansdb=beansdb)
         oa = db.db_get('a')
         ob = db.db_get('b')
         try:
-            with db.transaction():
+            with start_transaction(db):
                 db.db_set('a', 'xixi')
                 db.db_set('b', 'haha')
                 raise AE
@@ -63,7 +82,7 @@ class TestDataBase(TestCase):
             pass
         self.assertEqual(db.db_get('a'), oa)
         self.assertEqual(db.db_get('b'), ob)
-        with db.transaction():
+        with start_transaction(db):
             db.db_set('a', 'xixi')
             db.db_set('b', 'haha')
         self.assertEqual(db.db_get('a'), 'xixi')
@@ -76,7 +95,7 @@ class TestDataBase(TestCase):
         self.assertFalse(db.in_transaction())
         r = db.cancel_transaction()
         self.assertFalse(r)
-        with db.transaction():
+        with start_transaction(db):
             self.assertTrue(db.in_transaction())
             id = db.execute(
                 'insert into foo(name, age, age_str, `key`) values(%s, %s, %s, %s)',
@@ -84,10 +103,11 @@ class TestDataBase(TestCase):
             )
             r = db.cancel_transaction()
             self.assertTrue(r)
-        rv = db.execute(
-            'select * from foo where id = %s',
-            id
-        )
+        with start_transaction(db):
+            rv = db.execute(
+                'select * from foo where id = %s',
+                id
+            )
         self.assertEqual(rv, ())
 
     def test_add_commit_handler(self):
@@ -96,14 +116,16 @@ class TestDataBase(TestCase):
         db.report = Mock()
         handler = Mock()
         db.add_commit_handler(handler)
-        db.commit()
+        with start_transaction(db):
+            db.commit()
         self.assertEqual(db.report.call_count, 0)
         self.assertTrue(handler.called)
         self.assertEqual(handler.call_count, 1)
         handler = Mock()
         handler.side_effect = AE()
         db.add_commit_handler(handler)
-        db.commit()
+        with start_transaction(db):
+            db.commit()
         self.assertEqual(db.report.call_count, 1)
         db.report = old_report
 
@@ -113,13 +135,15 @@ class TestDataBase(TestCase):
         db.report = Mock()
         func = Mock()
         db.add_lazy_func(func)
-        db.commit()
+        with start_transaction(db):
+            db.commit()
         self.assertEqual(db.report.call_count, 0)
         self.assertTrue(func.called)
         self.assertEqual(func.call_count, 1)
         func = Mock()
         func.side_effect = AE()
         db.add_lazy_func(func)
-        db.commit()
+        with start_transaction(db):
+            db.commit()
         self.assertEqual(db.report.call_count, 1)
         db.report = old_report

@@ -61,6 +61,9 @@ class OLOCursor(object):
         self.cur = cur
         self.db = db
 
+        assert self.db.in_transaction(), 'create cursor must in transaction!'
+        self.db.get_last_transaction().add_cur(self)
+
     def __getattr__(self, name):
         return getattr(self.cur, name)
 
@@ -85,6 +88,9 @@ class OLOCursor(object):
         return self.execute(sql, params, **kwargs)
 
     def execute(self, sql, *args, **kwargs):
+        assert self.db.in_transaction(), 'cursor execute must in transaction!'
+        assert self in self.db.get_last_transaction().get_curs(), 'cursor not in this transaction!'  # noqa
+
         if isinstance(self.db, DataBase):
             kwargs['called_from_store'] = kwargs.pop('called_from_store', True)  # noqa pragma: no cover
         r = self.cur.execute(sql, *args, **kwargs)
@@ -170,9 +176,10 @@ class BaseDataBase(object):
 
     def get_tables(self):
         if self._tables is None:
-            c = self.get_cursor()
             try:
-                c.execute('SHOW TABLES')
+                with self.transaction():
+                    c = self.get_cursor()
+                    c.execute('SHOW TABLES')
                 self._tables = {t for t, in c}
             except Exception:  # pragma: no cover
                 return set()  # pragma: no cover
@@ -184,10 +191,11 @@ class BaseDataBase(object):
                 tables = self.get_tables()
                 if table_name not in tables:
                     return []
-                c = self.get_cursor()
-                c.execute('SHOW INDEX FROM `{}`'.format(
-                    table_name
-                ))
+                with self.transaction():
+                    c = self.get_cursor()
+                    c.execute('SHOW INDEX FROM `{}`'.format(
+                        table_name
+                    ))
                 self._index_rows_mapping[table_name] = c.fetchall()
             except Exception:  # pragma: no cover
                 return []  # pragma: no cover
@@ -341,7 +349,6 @@ class BaseDataBase(object):
 
     def commit(self):
         res = self.sql_commit()
-        self.log('COMMIT')
         self.commit_beansdb()
         self._run_lazy_funcs()
         self._run_commit_handlers()
@@ -349,7 +356,6 @@ class BaseDataBase(object):
 
     def rollback(self):
         res = self.sql_rollback()
-        self.log('ROLLBACK')
         self._local.pop_beansdb_transaction()
         self._local.clear_lazy_funcs()
         self._run_rollback_handlers()
@@ -374,6 +380,9 @@ class BaseDataBase(object):
 
     def in_transaction(self):
         return self.transaction_depth > 0
+
+    def get_last_transaction(self):
+        return self._local._transactions[-1]
 
     def transaction(self):
         return Transaction(self)
@@ -444,13 +453,15 @@ class DataBase(BaseDataBase):
         return OLOCursor(cur, self)  # pragma: no cover
 
     def gen_tables_schema(self):
-        raise NotImplementedError("not implement gen_tables_schema!")
+        raise NotImplementedError('not implement gen_tables_schema!')
 
     def sql_execute(self, sql, params=None):
         return self.store.execute(sql, params)
 
     def sql_commit(self):
+        self.log('COMMIT')
         return self.store.commit()
 
     def sql_rollback(self):
+        self.log('ROLLBACK')
         return self.store.rollback()

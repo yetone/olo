@@ -10,7 +10,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from config import mysql_cfg
 
 
-db_url = 'mysql://{user}:{passwd}@{host}:{port}/{db}'.format(**mysql_cfg)
+db_url = 'mysql+pymysql://{user}:{passwd}@{host}:{port}/{db}'.format(
+    **mysql_cfg
+)
 
 
 engine = create_engine(db_url)

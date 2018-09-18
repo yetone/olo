@@ -8,6 +8,11 @@ from sqlalchemy_models import (
 from utils import timer as _timer
 from config import get_mysql_conn
 
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 conn = get_mysql_conn()
 
@@ -36,7 +41,7 @@ def timer(name, init=False):
         try:
             teardown()
             setup()
-        except:
+        except Exception:
             pass
     return _timer(name)
 
@@ -120,7 +125,7 @@ def _run():
 def run():
     try:
         teardown()
-    except:
+    except Exception:
         pass
     try:
         setup()
