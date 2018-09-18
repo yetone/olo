@@ -93,3 +93,16 @@ class TestASTAPI(TestCase):
         )
         self.is_same_q(q1, q2)
         self.is_same_q(q2, q3)
+
+    def test_func(self):
+        q1 = Foo.query(funcs.COUNT(funcs.DISTINCT(Foo.id))).filter(
+            (Foo.id < 1) & (Foo.name == 'foo')
+        )
+
+        @select
+        def q2():
+            for f in Foo:
+                if f.id < 1 and f.name == 'foo':
+                    yield funcs.COUNT(funcs.DISTINCT(Foo.id))
+
+        self.is_same_q(q1, q2)
