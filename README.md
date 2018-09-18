@@ -11,6 +11,9 @@
     <a href="https://codecov.io/gh/yetone/olo">
         <img alt="Coverage Status" src="https://codecov.io/gh/yetone/olo/branch/master/graph/badge.svg" />
     </a>
+    <a href="https://www.codacy.com/project/yetone/olo/dashboard?utm_source=github.com&utm_medium=referral&utm_content=yetone/olo&utm_campaign=Badge_Grade_Dashboard">
+        <img alt="code quality" src="https://api.codacy.com/project/badge/Grade/a5ad69c098814cb18cfe28174cf7f35b?isInternal=true" />
+    </a>
     <a href="https://scrutinizer-ci.com/g/yetone/olo/">
         <img alt="code quality" src="https://img.shields.io/scrutinizer/g/yetone/olo/master.svg" />
     </a>
