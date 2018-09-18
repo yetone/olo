@@ -5,20 +5,27 @@
 # 
 
 <p align="center">
+    <a href="https://travis-ci.org/yetone/olo">
+        <img alt="Build Status" src="https://travis-ci.org/yetone/olo.svg?branch=master">
+    </a>
+    <a href="https://codecov.io/gh/yetone/olo">
+        <img alt="Coverage Status" src="https://codecov.io/gh/yetone/olo/branch/master/graph/badge.svg" />
+    </a>
+    <a href="https://scrutinizer-ci.com/g/yetone/olo/">
+        <img alt="code quality" src="https://img.shields.io/scrutinizer/g/yetone/olo/master.svg" />
+    </a>
+    <br />
+    <a href="https://pypi.org/project/olo">
+        <img alt="PyPI Package latest release" src="https://img.shields.io/pypi/v/olo.svg" />
+    </a>
+    <a href="https://pypi.org/project/olo">
+        <img alt="PyPI Wheel" src="https://img.shields.io/pypi/wheel/olo.svg" />
+    </a>
     <a href="https://www.python.org">
         <img alt="Support Python Version" src="https://img.shields.io/badge/Python-2.7-brightgreen.svg">
     </a>
     <a href="https://www.python.org">
         <img alt="Support Python Version" src="https://img.shields.io/badge/Python-3.6-brightgreen.svg">
-    </a>
-    <a href="https://travis-ci.org/yetone/olo">
-        <img alt="Build Status" src="https://travis-ci.org/yetone/olo.svg?branch=master">
-    </a>
-    <a href="https://codecov.io/gh/yetone/olo">
-        <img src="https://codecov.io/gh/yetone/olo/branch/master/graph/badge.svg" />
-    </a>
-    <a href="https://pypi.org/project/olo/">
-        <img src="https://img.shields.io/pypi/v/olo.svg" />
     </a>
 </p>
 
