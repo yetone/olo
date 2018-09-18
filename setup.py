@@ -44,7 +44,7 @@ setup(
     license='MIT License',
     author='yetone',
     author_email='guanxipeng@douban.com',
-    packages=find_packages(exclude=['tests.*', 'tests', 'benchmarks']),
+    packages=find_packages(exclude=['test.*', 'test', 'benchmarks']),
     setup_requires=['Cython >= 0.20'],
     install_requires=install_requires,
     platforms='any',

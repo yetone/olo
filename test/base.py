@@ -2,7 +2,7 @@
 from datetime import datetime, date
 from uuid import uuid4
 
-from tests.fixture import (  # noqa pylint:disable=W
+from test.fixture import (  # noqa pylint:disable=W
     TestCase, mc, beansdb,
     init_tables,
     MYSQL_HOST, MYSQL_PORT,

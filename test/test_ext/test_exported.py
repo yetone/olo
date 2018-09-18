@@ -1,6 +1,6 @@
 from olo.ext.exported import exported_property
 
-from tests.base import TestCase, Foo as _Foo
+from test.base import TestCase, Foo as _Foo
 
 
 class TestExported(TestCase):
