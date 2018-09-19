@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-    ORM.
+    ORM with intelligent and elegant cache manager.
 </p>
 
 <p align="center">
