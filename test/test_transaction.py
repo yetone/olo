@@ -248,3 +248,29 @@ class TestTransaction(TestCase):
 
         foo = Foo.get(foo.id)
         self.assertEqual(foo.name, 'foo')
+
+    def test_decorator(self):
+
+        @db.transaction()
+        def func():
+            return Foo.create()
+
+        foo = func()
+
+        self.assertEqual(foo.id, Foo.cache.get(foo.id).id)
+        self.assertEqual(foo.id, 1)
+
+        try:
+
+            @db.transaction()
+            def func1():
+                foo = Foo.create(name='foo', age=1, key='1')
+                foo = Foo.create(name='foo', age=2, key='1')
+
+            func1()
+
+        except Exception:
+            pass
+
+        count = Foo.count_by()
+        self.assertEqual(count, 1)

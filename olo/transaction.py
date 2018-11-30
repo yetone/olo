@@ -1,5 +1,7 @@
 import threading
 
+from functools import wraps
+
 
 class Transaction(threading.local):
     def __init__(self, db):
@@ -30,6 +32,13 @@ class Transaction(threading.local):
         self._db.rollback()
         if begin:
             self._begin()
+
+    def __call__(self, func):
+        @wraps(func)
+        def _(*args, **kwargs):
+            with self:
+                return func(*args, **kwargs)
+        return _
 
     def __enter__(self):
         self._orig_autocommit = self._db.autocommit
