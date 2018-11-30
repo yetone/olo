@@ -58,7 +58,4 @@ class Transaction(threading.local):
                 self._curs.pop()
 
             if self.conn is not None:
-                if not self._canceled and not exc_type and depth == 1:
-                    # FIXME
-                    self.conn.commit()
                 self.conn.release()

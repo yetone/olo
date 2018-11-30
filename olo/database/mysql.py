@@ -147,10 +147,10 @@ class MySQLDataBase(BaseDataBase):
             pass  # pragma: no cover
         cur = self.get_cursor()
         res = cur.execute(sql, params, **kwargs)
+        self.modified_cursors.put_nowait(cur)
         if cmd == 'select':
             return cur.fetchall()
         cur.is_modified = True
-        self.modified_cursors.put_nowait(cur)
         if (
             not kwargs.get('executemany') and
             cmd == 'insert' and cur.lastrowid

@@ -338,7 +338,6 @@ class BaseDataBase(object):
         return self.execute(sql, params=params)
 
     def execute(self, sql, params=None):
-        self.log(sql, params)
         return self.sql_execute(sql, params)
 
     def commit_beansdb(self):
@@ -453,6 +452,7 @@ class DataBase(BaseDataBase):
         raise NotImplementedError('not implement gen_tables_schema!')
 
     def sql_execute(self, sql, params=None):
+        self.log(sql, params)
         return self.store.execute(sql, params)
 
     def sql_commit(self):
