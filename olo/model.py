@@ -75,6 +75,7 @@ class ModelOptions(object):
                  report=None,
                  table_engine=None,
                  table_charset=None,
+                 max_cache_count=200,
                  **kwargs):
         assert db_field_version in (0, 1)
         if db:
@@ -92,6 +93,7 @@ class ModelOptions(object):
         self.auto_use_cache = auto_use_cache
         self.table_engine = table_engine
         self.table_charset = table_charset
+        self.max_cache_count = max_cache_count
         self._report = report
         self.update(**kwargs)
 

@@ -479,12 +479,12 @@ class TestCache(TestCase):
             self.assertFalse(execute.called)
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1,
-                                     limit=Bar.cache.MAX_COUNT + 1)
+                                     limit=Bar._options.max_cache_count + 1)
             self.assertEqual(len(bars), 4)
             self.assertFalse(execute.called)
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1,
-                                     limit=Bar.cache.MAX_COUNT + 1)
+                                     limit=Bar._options.max_cache_count + 1)
             self.assertEqual(len(bars), 4)
             self.assertFalse(execute.called)
         with patched_execute as execute:
@@ -664,11 +664,11 @@ class TestCache(TestCase):
             self.assertFalse(execute.called)
 
     def test_gets_by_over_limit(self):
-        max_count = Bar.cache.MAX_COUNT
+        max_count = Bar._options.max_cache_count
         Bar.create(name='b', xixi='b', age=1)
         Bar.create(name='c', xixi='b', age=1)
         Bar.create(name='d', xixi='b', age=1)
-        Bar.cache.MAX_COUNT = 2
+        Bar._options.max_cache_count = 2
         try:
             with patched_execute as execute:
                 bars = Bar.cache.gets_by(xixi='b', age=1)
@@ -703,7 +703,7 @@ class TestCache(TestCase):
                 self.assertEqual(len(bars), 3)
                 self.assertTrue(execute.called)
         finally:
-            Bar.cache.MAX_COUNT = max_count
+            Bar._options.max_cache_count = max_count
 
     def test_count_by(self):
         with patched_execute as execute:

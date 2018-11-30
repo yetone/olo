@@ -23,10 +23,13 @@ def wash_kwargs(func):
 
 
 class CacheWrapper(object):
-    MAX_COUNT = 200
 
     def __init__(self, model_class):
         self._model_class = model_class
+
+    @property
+    def max_cache_count(self):
+        return self._model_class._options.max_cache_count
 
     @property
     def _db(self):
@@ -246,21 +249,26 @@ class CacheWrapper(object):
         if limit is None:
             limit = sys.maxsize
 
-        over_limit = start + limit > self.MAX_COUNT
+        no_limit = self.max_cache_count == 0
+
+        over_limit = start + limit > self.max_cache_count
+
+        if no_limit:
+            over_limit = False
 
         res = self._cache_client.get(key)
         if res is None:
             res = self._model_class.get_entities_by(
                 [pk_name],
-                start=0,
-                limit=self.MAX_COUNT + 1,
+                start=0 if not no_limit else None,
+                limit=self.max_cache_count + 1 if not no_limit else None,
                 order_by=order_by,
                 **kwargs
             )
 
             self._cache_client.set(key, res)
 
-        if len(res) == self.MAX_COUNT + 1 and over_limit:
+        if not no_limit and len(res) == self.max_cache_count + 1 and over_limit:
             return fallback()
 
         return self.gets(res[start: start + limit])
