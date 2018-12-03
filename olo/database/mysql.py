@@ -113,16 +113,23 @@ class MySQLDataBase(BaseDataBase):
     def __init__(self, host, port, user, password, dbname,
                  charset='utf8mb4',
                  beansdb=None, autocommit=True,
-                 report=lambda *args, **kwargs: None):
+                 report=lambda *args, **kwargs: None,
+                 max_active_size=10,
+                 max_idle_size=5):
 
         super(MySQLDataBase, self).__init__(
             beansdb=beansdb,
             autocommit=autocommit,
             report=report
         )
-        self.pool = Pool(lambda: create_conn(
-            host, port, user, password, dbname, charset
-        ), conn_proxy_cls=MySQLConnProxy)
+        self.pool = Pool(
+            lambda: create_conn(
+                host, port, user, password, dbname, charset
+            ),
+            conn_proxy_cls=MySQLConnProxy,
+            max_active_size=max_active_size,
+            max_idle_size=max_idle_size,
+        )
         self.modified_cursors = ThreadedObject(Queue)
 
     def get_conn(self):
