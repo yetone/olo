@@ -105,10 +105,18 @@ class Pool(object):
             '<Pool active_size={}, idle_size={}, max_active_size={},'
             ' max_idle_size={}>'
         ).format(
-            len(self.active_conns), len(self.idle_conns), self.max_active_size,
+            self.active_size, self.idle_size, self.max_active_size,
             self.max_idle_size)
 
     __repr__ = __str__
+
+    @property
+    def active_size(self):
+        return len(self.active_conns)
+
+    @property
+    def idle_size(self):
+        return len(self.idle_conns)
 
     def _create_conn(self):
         conn = self.creator()
@@ -145,6 +153,10 @@ class Pool(object):
     @log_pool('release conn: {conn}')
     def release_conn(self, conn):
         if len(self.idle_conns) == self.max_idle_size or conn.is_expired:
+            if conn in self.active_conns:
+                self.active_conns.remove(conn)
+            if conn in self.idle_conns:
+                self.idle_conns.remove(conn)  # pragma: no cover
             if not conn.is_closed:
                 conn.close()
             return
