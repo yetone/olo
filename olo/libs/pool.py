@@ -128,7 +128,14 @@ class Pool(object):
             with self.lock:
                 if self.idle_conns:
                     conn = self.idle_conns.pop(0)
-                    if conn.is_expired or conn.is_closed or not self.ping_conn(conn):
+                    if not self.ping_conn(conn):
+                        # FIXME
+                        try:
+                            self.destroy_conn(conn)
+                        except Exception:
+                            pass
+                        return self.acquire_conn()
+                    if conn.is_expired or conn.is_closed:
                         self.destroy_conn(conn)
                         return self.acquire_conn()
                     self.active_conns.append(conn)
