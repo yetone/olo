@@ -128,7 +128,7 @@ class Pool(object):
             with self.lock:
                 if self.idle_conns:
                     conn = self.idle_conns.pop(0)
-                    if conn.is_expired:
+                    if conn.is_expired or conn.is_closed:
                         self.destroy_conn(conn)
                         return self.acquire_conn()
                     self.active_conns.append(conn)
@@ -165,7 +165,7 @@ class Pool(object):
     @lock
     @log_pool('release conn: {conn}')
     def release_conn(self, conn):
-        if len(self.idle_conns) == self.max_idle_size or conn.is_expired:
+        if len(self.idle_conns) == self.max_idle_size or conn.is_closed or conn.is_expired:
             self.destroy_conn(conn)
             return
         if not conn.is_closed and conn not in self.idle_conns:
