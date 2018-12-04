@@ -37,7 +37,7 @@ for line in open('requirements.txt', 'r'):
 
 setup(
     name='olo',
-    version='0.2.3',
+    version='0.2.4',
     keywords=('ORM', 'olo', 'cache', 'sqlstore'),
     description='ORM with intelligent and elegant cache manager',
     url='https://github.com/yetone/olo',
