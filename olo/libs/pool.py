@@ -128,7 +128,7 @@ class Pool(object):
             with self.lock:
                 if self.idle_conns:
                     conn = self.idle_conns.pop(0)
-                    if conn.is_expired or conn.is_closed:
+                    if conn.is_expired or conn.is_closed or not self.ping_conn(conn):
                         self.destroy_conn(conn)
                         return self.acquire_conn()
                     self.active_conns.append(conn)
@@ -142,6 +142,17 @@ class Pool(object):
                 conn = self._create_conn()
                 self.active_conns.append(conn)
                 return conn
+
+
+    def ping_conn(self, conn):
+        try:
+            cur = conn.cursor()
+            cur.execute('select 1')
+            cur.fetchone()
+            cur.close()
+            return True
+        except Exception:
+            return False
 
     @lock
     def clear_conns(self):
