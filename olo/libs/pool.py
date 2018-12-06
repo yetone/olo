@@ -150,7 +150,6 @@ class Pool(object):
                 self.active_conns.append(conn)
                 return conn
 
-
     def ping_conn(self, conn):
         try:
             cur = conn.cursor()
