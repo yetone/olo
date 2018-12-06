@@ -152,10 +152,7 @@ class Pool(object):
 
     def ping_conn(self, conn):
         try:
-            cur = conn.cursor()
-            cur.execute('select 1')
-            cur.fetchone()
-            cur.close()
+            conn.ping()
             return True
         except Exception:
             return False
