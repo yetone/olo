@@ -1,5 +1,6 @@
 # coding=utf-8
 from datetime import datetime, date
+from enum import Enum
 from uuid import uuid4
 
 from test.fixture import (  # noqa pylint:disable=W
@@ -158,6 +159,26 @@ class Lala(BaseModel):
     id = Field(int, primary_key=True, output=str, auto_increment=True, length=11)
     name = Field(str, length=255)
     age = Field(int, length=11)
+
+
+class ColorEnum(Enum):
+    red = 1
+    blue = 2
+
+    @classmethod
+    def parse(cls, value):
+        # int -> enum
+        return cls(value)
+
+    @classmethod
+    def deparse(cls, value):
+        # enum -> int
+        return value.value
+
+
+class Haha(BaseModel):
+    id = Field(int, primary_key=True, output=str, auto_increment=True, length=11)
+    color = DbField(ColorEnum, parser=ColorEnum.parse, deparser=ColorEnum.deparse)
 
 
 db.create_all()
