@@ -180,6 +180,9 @@ class Haha(BaseModel):
     id = Field(int, primary_key=True, output=str, auto_increment=True, length=11)
     color = DbField(ColorEnum, parser=ColorEnum.parse, deparser=ColorEnum.deparse)
 
+    def get_uuid(self):
+        return '/haha/{}'.format(self.id)
+
 
 db.create_all()
 
