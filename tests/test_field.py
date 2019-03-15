@@ -387,5 +387,10 @@ class TestDbField(TestCase):
                 for d in ds:
                     self.assertEqual(d.count, d.id)
                     self.assertEqual(d.prop1, [str(d.id)])
+
+                    # visit `count1` field multi times
+                    for j in xrange(5):
+                        self.assertIsNone(d.count1)
+
                 self.assertEqual(db_get.call_count, 0)
-                self.assertEqual(db_get_multi.call_count, 3)
+                self.assertEqual(db_get_multi.call_count, 4)
