@@ -297,6 +297,24 @@ class Decompiler(object):
         star = decompiler.stack.pop()
         return decompiler._call_function([], star, star2)
 
+    def CALL_METHOD(decompiler, argc):
+        pop = decompiler.stack.pop
+        args = []
+        if argc >= 256:
+            kwargc = argc // 256
+            argc = argc % 256
+            for i in range(kwargc):
+                v = pop()
+                k = pop()
+                assert isinstance(k, ast.Const)
+                k = k.value # ast.Name(k.value)
+                args.append(ast.Keyword(k, v))
+        for i in range(argc):
+            args.append(pop())
+        args.reverse()
+        method = pop()
+        return ast.CallFunc(method, args)
+
     def COMPARE_OP(decompiler, op):
         oper2 = decompiler.stack.pop()
         oper1 = decompiler.stack.pop()
@@ -410,6 +428,9 @@ class Decompiler(object):
     def LOAD_GLOBAL(decompiler, varname):
         decompiler.names.add(varname)
         return ast.Name(varname)
+
+    def LOAD_METHOD(decompiler, methname):
+        return decompiler.LOAD_ATTR(methname)
 
     def LOAD_NAME(decompiler, varname):
         decompiler.names.add(varname)
