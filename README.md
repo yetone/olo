@@ -5,11 +5,11 @@
 # 
 
 <p align="center">
-    <a href="https://scrutinizer-ci.com/g/yetone/olo/">
-        <img alt="Build Status" src="https://scrutinizer-ci.com/g/yetone/olo/badges/build.png?b=master">
+    <a href="https://travis-ci.org/yetone/olo">
+        <img alt="Build Status" src="https://travis-ci.org/yetone/olo.svg?branch=master">
     </a>
-    <a href="https://scrutinizer-ci.com/g/yetone/olo/">
-        <img alt="Coverage Status" src="https://scrutinizer-ci.com/g/yetone/olo/badges/coverage.png?b=master" />
+    <a href="https://codecov.io/gh/yetone/olo">
+        <img alt="Coverage Status" src="https://codecov.io/gh/yetone/olo/branch/master/graph/badge.svg" />
     </a>
     <a href="https://app.fossa.io/projects/git%2Bgithub.com%2Fyetone%2Folo?ref=badge_shield" alt="FOSSA Status"><img src="https://app.fossa.io/api/projects/git%2Bgithub.com%2Fyetone%2Folo.svg?type=shield"/></a>
     <a href="https://www.codacy.com/project/yetone/olo/dashboard?utm_source=github.com&utm_medium=referral&utm_content=yetone/olo&utm_campaign=Badge_Grade_Dashboard">
