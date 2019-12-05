@@ -72,6 +72,7 @@ def _lambda_eval(func, self, *args, **kwargs):
 
 def _detect_table_alias(table_section, rev_alias_mapping=None):
     rev_alias_mapping = {} if rev_alias_mapping is None else rev_alias_mapping
+
     if table_section[0] == 'TABLE':
         alias = table_section[1][0].lower()
         orig_alias = alias
@@ -81,9 +82,11 @@ def _detect_table_alias(table_section, rev_alias_mapping=None):
             alias = orig_alias + str(n)
         rev_alias_mapping[alias] = table_section[1]
         return ['ALIAS', table_section, alias]
-    elif isinstance(table_section, list):
+
+    if isinstance(table_section, list):
         return [_detect_table_alias(x, rev_alias_mapping=rev_alias_mapping)
                 for x in table_section]
+
     return table_section
 
 

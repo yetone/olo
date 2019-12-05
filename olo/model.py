@@ -372,6 +372,7 @@ class ModelMeta(type):
         return super(ModelMeta, mcs).__new__(mcs, class_name, bases, attrs)
 
     def __init__(cls, class_name, bases, attrs):
+        # pylint: disable=too-many-statements
         super(ModelMeta, cls).__init__(class_name, bases, attrs)
 
         if cls.__abstract__:
@@ -650,6 +651,7 @@ class Model(with_metaclass(ModelMeta)):
         return is_success
 
     def update(self, **attrs):
+        # pylint: disable=too-many-statements
         self._check_attrs(attrs)
 
         attrs = self._wash_attrs(attrs)

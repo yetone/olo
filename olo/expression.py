@@ -97,7 +97,7 @@ class BinaryExpression(Expression, BinaryOperationMixin):
             """
             if self.right is True:
                 return self.left.get_sql_ast()
-            elif self.right is False:
+            if self.right is False:
                 nleft = -self.left
                 if nleft:
                     return nleft.get_sql_ast()
