@@ -389,8 +389,7 @@ class DbField(BaseField):
             # beansdb 不支持 set None
             db.db_delete(db_key)
             return
-        else:
-            value = transform_type(value, self.type)
+        value = transform_type(value, self.type)
         db.db_set(db_key, value)
 
     def _delete_v0(self, obj):

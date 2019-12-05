@@ -93,7 +93,7 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
             if not r:
                 return False
         return True
-    elif t is tuple:
+    if t is tuple:
         if len(type_) != len(obj):
             return False
         for i, e in enumerate(obj):
@@ -101,7 +101,7 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
             if not r:
                 return False
         return True
-    elif t is dict:
+    if t is dict:
         items = get_items(type_)
         if not items:
             return isinstance(obj, t)
@@ -119,7 +119,7 @@ def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
     if type_ is str:
         if isinstance(obj, unicode):
             return obj.encode('utf-8')  # pragma: no cover
-        elif isinstance(obj, (list, dict)):
+        if isinstance(obj, (list, dict)):
             return json.dumps(obj)
         return type_(obj)
     if type_ is unicode:
@@ -154,7 +154,7 @@ def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
         raise TypeError('{} is not a {} type.'.format(repr(obj), t))
     if isinstance(obj, list):
         return [transform_type(e, type_[0]) for e in obj]
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
         d = {}
         items = get_items(type_)
         kt, vt = items[0]
