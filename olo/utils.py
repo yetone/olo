@@ -337,14 +337,14 @@ ThreadSafeDict = make_thread_safe_class(dict, method_names=(
 
 
 SQL_PATTERNS = {
-    'select': re.compile(r'select\s.*?\sfrom\s+`?(?P<table>\w+)`?',
+    'select': re.compile(r'select\s.*?\sfrom\s+[`"]?(?P<table>\w+)[`"]?',
                          re.I | re.S),
-    'insert': re.compile(r'insert\s+(ignore\s+)?(into\s+)?`?(?P<table>\w+)`?',
+    'insert': re.compile(r'insert\s+(ignore\s+)?(into\s+)?[`"]?(?P<table>\w+)[`"]?',
                          re.I),
-    'update': re.compile(r'update\s+(ignore\s+)?`?(?P<table>\w+)`?\s+set',
+    'update': re.compile(r'update\s+(ignore\s+)?[`"]?(?P<table>\w+)[`"]?\s+set',
                          re.I),
-    'replace': re.compile(r'replace\s+(into\s+)?`?(?P<table>\w+)`?', re.I),
-    'delete': re.compile(r'delete\s+from\s+`?(?P<table>\w+)`?', re.I),
+    'replace': re.compile(r'replace\s+(into\s+)?[`"]?(?P<table>\w+)[`"]?', re.I),
+    'delete': re.compile(r'delete\s+from\s+[`"]?(?P<table>\w+)[`"]?', re.I),
 }
 
 

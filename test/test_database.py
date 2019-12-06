@@ -5,6 +5,7 @@ from mock import Mock
 from olo import DataBase
 from olo.errors import DataBaseError
 from .base import TestCase, db as store, beansdb
+from .fixture import is_pg
 from .utils import AE
 
 
@@ -97,18 +98,28 @@ class TestDataBase(TestCase):
         self.assertFalse(r)
         with start_transaction(db):
             self.assertTrue(db.in_transaction())
-            id = db.execute(
-                'insert into foo(name, age, age_str, `key`) values(%s, %s, %s, %s)',
-                ('foo', 1, '1', '1')
-            )
+            if is_pg:
+                id = db.execute(
+                    'insert into foo(name, age, age_str, "key") values(%s, %s, %s, %s)',
+                    ('foo', 1, '1', '1')
+                )
+            else:
+                id = db.execute(
+                    'insert into foo(name, age, age_str, `key`) values(%s, %s, %s, %s)',
+                    ('foo', 1, '1', '1')
+                )
             r = db.cancel_transaction()
             self.assertTrue(r)
         with start_transaction(db):
             rv = db.execute(
                 'select * from foo where id = %s',
-                id
+                (id,)
             )
-        self.assertEqual(rv, ())
+        # FIXME(PG)
+        if is_pg:
+            self.assertEqual(rv, [])
+        else:
+            self.assertEqual(rv, ())
 
     def test_add_commit_handler(self):
         db = DataBase(store)

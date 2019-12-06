@@ -1,15 +1,21 @@
 # pylint: disable=W0703
+from __future__ import annotations
 
 import json
 import logging
 from functools import wraps
+from queue import Queue, Empty
+from typing import TYPE_CHECKING, Optional, Tuple, Set, List
+
+if TYPE_CHECKING:
+    from olo.model import Model
 
 from olo.local import DbLocal
 from olo.transaction import Transaction
 from olo.logger import logger
 from olo.errors import DataBaseError
 from olo.compat import str_types, unicode
-from olo.utils import to_camel_case
+from olo.utils import to_camel_case, ThreadedObject, parse_execute_sql
 from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator  # noqa
 from olo.field import BaseField
 
@@ -22,6 +28,7 @@ def need_beansdb(func):
                 'Need beansdb client in database configure!'
             )
         return func(self, *args, **kwargs)
+
     return _
 
 
@@ -32,6 +39,7 @@ def need_beansdb_commit(func):
         if self.autocommit:
             self.commit_beansdb()
         return res
+
     return _
 
 
@@ -40,20 +48,8 @@ def sql_literal_factory(db):
         if isinstance(v, unicode):
             v = v.encode('utf-8')
         return db.literal(v)
+
     return literal
-
-
-def log_sql(cur, sql, params=None, level=logging.INFO):
-    db = cur._get_db()
-    literal = sql_literal_factory(db)
-    msg_tpl = '[SQL]: {}'
-    if params is None:
-        msg = msg_tpl.format(sql)
-    else:
-        if not isinstance(params, (list, tuple, dict)):
-            params = (params,)
-        msg = msg_tpl.format(sql % tuple(map(literal, params)))
-    logger.log(msg=msg, level=level)
 
 
 class OLOCursor(object):
@@ -96,14 +92,17 @@ class OLOCursor(object):
         r = self.cur.execute(sql, *args, **kwargs)
         params = args[0] if args else None
         if self.db.enable_log:
-            log_sql(self.cur, sql, params)
+            self.log(sql, params)
         return r
 
     def close(self):
         return self.cur.close()  # pragma: no cover
 
-    def _get_db(self):
-        return self.cur._get_db()
+    def log(self, sql: str, params: Optional[Tuple] = None, level: int = logging.INFO) -> None:
+        raise NotImplementedError
+
+    def get_last_rowid(self):
+        raise NotImplementedError
 
 
 def get_sqls(lines):
@@ -115,8 +114,21 @@ def get_sqls(lines):
             sql = ''
 
 
-class BaseDataBase(object):
+def reduce_indexes(indexes: Set[Tuple]) -> List[Tuple]:
+    indexes = sorted(indexes)
+    l = len(indexes)
+    res = []
+    for i in range(l):
+        cur = indexes[i]
+        if i == l - 1:
+            res.append(cur)
+            break
+        if tuple(indexes[i + 1][:len(cur)]) != tuple(cur):
+            res.append(cur)
+    return res
 
+
+class BaseDataBase(object):
     ast_translator = MySQLSQLASTTranslator()
 
     def __init__(self, beansdb=None, autocommit=True,
@@ -128,6 +140,7 @@ class BaseDataBase(object):
         self._index_rows_mapping = {}
         self.enable_log = False
         self._models = []
+        self.modified_cursors = ThreadedObject(Queue)
 
     def add_lazy_func(self, func):
         self._local.add_lazy_func(func)
@@ -201,20 +214,38 @@ class BaseDataBase(object):
                 return []  # pragma: no cover
         return self._index_rows_mapping[table_name]
 
-    def get_cursor(self):
-        raise NotImplementedError
-
     def gen_tables_schema(self):
         asts = [
-            self.to_model_table_schema_sql_ast(m)
-            for m in self._models
-        ]
-        return self.ast_translator.translate([
-            'PROGN'
-        ] + asts)[0]
+                   self.to_model_table_schema_sql_ast(m)
+                   for m in self._models
+               ] + sum(
+            (self.to_model_indexes_sql_asts(m) for m in self._models),
+            []
+        )
+        return self.ast_translator.translate(['PROGN'] + asts)[0]
 
     @classmethod
-    def to_model_table_schema_sql_ast(cls, model):
+    def to_model_indexes_sql_asts(cls, model: Model):
+        asts = []
+
+        for key in reduce_indexes(model.__index_keys__):
+            key_name = 'idx_' + '_'.join(map(to_camel_case, key))
+            names = []
+            for p in key:
+                f = getattr(model, p)
+                if not isinstance(f, BaseField):
+                    break  # pragma: no cover
+                names.append(f.name)
+            else:
+                if not names:
+                    continue
+                asts.append([
+                    'CREATE_INDEX', True, key_name, model._get_table_name(), names
+                ])
+        return asts
+
+    @classmethod
+    def to_model_table_schema_sql_ast(cls, model: Model):
         # pylint: disable=too-many-statements
 
         ast = ['CREATE_TABLE', False, True, model._get_table_name()]
@@ -234,21 +265,6 @@ class BaseDataBase(object):
         create_definition_ast.append([
             'KEY', 'PRIMARY', None, list(model.__primary_key__)
         ])
-
-        for key in model.__index_keys__:
-            key_name = 'idx_' + '_'.join(map(to_camel_case, key))
-            names = []
-            for p in key:
-                f = getattr(model, p)
-                if not isinstance(f, BaseField):
-                    break  # pragma: no cover
-                names.append(f.name)
-            else:
-                if not names:
-                    continue
-                create_definition_ast.append([
-                    'KEY', 'INDEX', key_name, names
-                ])
 
         for key in model.__unique_keys__:
             key_name = 'uk_' + '_'.join(map(to_camel_case, key))
@@ -293,7 +309,7 @@ class BaseDataBase(object):
         if not self.enable_log:
             return
         cur = self.get_cursor()
-        log_sql(cur, sql, params=params, level=level)
+        cur.log(sql, params=params, level=level)
 
     def beansdb_log(self, cmd, args, kwargs, level=logging.INFO):
         if not self.enable_log:
@@ -322,14 +338,69 @@ class BaseDataBase(object):
     def begin(self):
         pass
 
-    def sql_execute(self, sql, params=None):
+    def get_cursor(self) -> OLOCursor:
         raise NotImplementedError
+
+    def sql_execute(self, sql, params=None, **kwargs):  # pylint: disable=W
+        cmd = None
+        try:
+            cmd, _ = parse_execute_sql(sql)
+        except Exception:  # pragma: no cover pylint: disable=W
+            pass  # pragma: no cover
+        cur = self.get_cursor()
+        res = cur.execute(sql, params, **kwargs)
+        self.modified_cursors.put_nowait(cur)
+        if cmd == 'select':
+            return cur.fetchall()
+        cur.is_modified = True
+        if (
+                not kwargs.get('executemany') and
+                cmd == 'insert'
+        ):
+            last_rowid = cur.get_last_rowid()
+            if last_rowid:
+                return last_rowid
+        return res
 
     def sql_commit(self):
-        raise NotImplementedError
+        first_err = None
+        commited = set()
+        while not self.modified_cursors.empty():
+            try:
+                cur = self.modified_cursors.get_nowait()
+                try:
+                    if cur.conn not in commited:
+                        commited.add(cur.conn)
+                        cur.conn.commit()
+                        self.log('COMMIT')
+                    cur.is_modified = False
+                except Exception as e:  # pragma: no cover pylint: disable=W
+                    if first_err is None:  # pragma: no cover
+                        first_err = e  # pragma: no cover
+            except Empty:  # pragma: no cover
+                pass  # pragma: no cover
+        if first_err is not None:
+            raise first_err  # pragma: no cover pylint: disable=E
 
     def sql_rollback(self):
-        raise NotImplementedError
+        first_err = None
+        rollbacked = set()
+        while not self.modified_cursors.empty():
+            try:
+                cur = self.modified_cursors.get_nowait()
+                try:
+                    if cur.conn not in rollbacked:
+                        rollbacked.add(cur.conn)
+                        cur.conn.rollback()
+                        self.log('ROLLBACK')
+                    cur.is_modified = False
+                except Exception as e:  # pragma: no cover pylint: disable=W
+                    if first_err is None:  # pragma: no cover
+                        first_err = e  # pragma: no cover
+            except Empty:  # pragma: no cover
+                pass  # pragma: no cover
+        if first_err is not None:
+            raise first_err  # pragma: no cover pylint: disable=E
 
     def ast_execute(self, sql_ast):
         sql, params = self.ast_translator.translate(sql_ast)
@@ -426,6 +497,23 @@ class BaseDataBase(object):
                 break
 
 
+class MySQLCursor(OLOCursor):
+    def get_last_rowid(self):
+        return self.lastrowid
+
+    def log(self, sql, params=None, level=logging.INFO):
+        db = self._get_db()
+        literal = sql_literal_factory(db)
+        msg_tpl = '[SQL]: {}'
+        if params is None:
+            msg = msg_tpl.format(sql)
+        else:
+            if not isinstance(params, (list, tuple, dict)):
+                params = (params,)
+            msg = msg_tpl.format(sql % tuple(map(literal, params)))
+        logger.log(msg=msg, level=level)
+
+
 class DataBase(BaseDataBase):
     def __init__(self, store, beansdb=None, autocommit=True,
                  report=lambda *args, **kwargs: None):
@@ -444,12 +532,12 @@ class DataBase(BaseDataBase):
         cur = self.store.get_cursor()  # pragma: no cover
         if cur is None:  # pragma: no cover
             return cur  # pragma: no cover
-        return OLOCursor(cur, self)  # pragma: no cover
+        return MySQLCursor(cur, self)  # pragma: no cover
 
     def gen_tables_schema(self):
         raise NotImplementedError('not implement gen_tables_schema!')
 
-    def sql_execute(self, sql, params=None):
+    def sql_execute(self, sql, params=None, **kwargs):
         self.log(sql, params)
         return self.store.execute(sql, params)
 

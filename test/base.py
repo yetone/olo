@@ -2,27 +2,36 @@
 from datetime import datetime, date
 from uuid import uuid4
 
+from olo import MySQLDataBase, PostgreSQLDataBase, Model, Field, DbField
+from olo.debug import set_debug
 from test.fixture import (  # noqa pylint:disable=W
     TestCase, mc, beansdb,
     init_tables,
     MYSQL_HOST, MYSQL_PORT,
     MYSQL_USER, MYSQL_PASSWORD,
     MYSQL_DB, MYSQL_CHARSET,
-)
-
-from olo import MySQLDataBase, Model, Field, DbField
-from olo.debug import set_debug
-
+    PGSQL_HOST, PGSQL_PORT,
+    PGSQL_USER, PGSQL_PASSWORD,
+    PGSQL_DB,
+    is_pg)
 
 init_tables()
 set_debug(True)
-db = MySQLDataBase(
-    MYSQL_HOST, MYSQL_PORT,
-    MYSQL_USER, MYSQL_PASSWORD,
-    MYSQL_DB,
-    charset=MYSQL_CHARSET,
-    beansdb=beansdb
-)
+if is_pg:
+    db = PostgreSQLDataBase(
+        PGSQL_HOST, PGSQL_PORT,
+        PGSQL_USER, PGSQL_PASSWORD,
+        PGSQL_DB,
+        beansdb=beansdb
+    )
+else:
+    db = MySQLDataBase(
+        MYSQL_HOST, MYSQL_PORT,
+        MYSQL_USER, MYSQL_PASSWORD,
+        MYSQL_DB,
+        charset=MYSQL_CHARSET,
+        beansdb=beansdb
+    )
 db.pool.enable_log = True
 
 
@@ -58,7 +67,7 @@ class Dummy(BaseModel):
     age = Field(int, default=12, on_update=lambda x: x.__class__.age + 1,
                 length=11)
     password = Field(str, noneable=True, encrypt=True, length=511)
-    flag = Field(int, noneable=True, choices=[0, 1, 2], length=5)
+    flag = Field(int, default=0, noneable=True, choices=[0, 1, 2], length=5)
     tags = Field([str], default=[])
     payload = Field({str: [int]}, noneable=True, default={})
     foo = Field(int, noneable=True, length=11)

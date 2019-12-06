@@ -1,4 +1,5 @@
 """abc is too slow"""
+from typing import List
 
 
 class Interface(object):
@@ -9,10 +10,10 @@ class SQLASTInterface(Interface):
     _alias_name = None
 
     @property
-    def alias_name(self):
+    def alias_name(self) -> str:
         return self._alias_name
 
-    def get_sql_ast(self):
+    def get_sql_ast(self) -> List:
         """return sql ast
         @rtype list
         """

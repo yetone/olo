@@ -7,7 +7,7 @@ from test.utils import patched_execute
 def prefetch_factory(model_class, default=None):
     def func(cls, query):
         return model_class.gets(
-            [o.id for o in query]
+            [str(o.id) for o in query]
         )
 
     return n(default=default)(func)
@@ -20,12 +20,12 @@ class TestN(TestCase):
 
             @n
             def a_bars(cls, foos):
-                bars = Bar.gets([f.id for f in foos])
+                bars = Bar.gets([str(f.id) for f in foos])
                 return bars
 
             @n
             def b_bars(cls, foos):
-                bars = Bar.gets([f.id for f in foos])
+                bars = Bar.gets([str(f.id) for f in foos])
                 return {
                     int(b.name): b
                     for b in bars
@@ -33,7 +33,7 @@ class TestN(TestCase):
 
             @n(1)
             def c_bars(cls, foos):
-                bars = Bar.gets([f.id for f in foos])
+                bars = Bar.gets([str(f.id) for f in foos])
                 return bars
 
             d_bars = prefetch_factory(Bar, default=1)
@@ -41,7 +41,7 @@ class TestN(TestCase):
             @n
             @classmethod
             def f_bars(cls, foos):
-                bars = Bar.gets([f.id for f in foos])
+                bars = Bar.gets([str(f.id) for f in foos])
                 return bars
 
         Foo.create(age=1)

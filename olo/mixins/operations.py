@@ -1,13 +1,22 @@
-class UnaryOperationMixin(object):
+from __future__ import annotations
+from typing import TYPE_CHECKING, Type
 
-    def desc(self):
+if TYPE_CHECKING:
+    from olo.expression import UnaryExpression, BinaryExpression
+
+
+class UnaryOperationMixin(object):
+    UnaryExpression: Type[UnaryExpression]
+
+    def desc(self) -> UnaryExpression:
         return self.UnaryExpression(self, 'DESC')
 
-    def asc(self):
+    def asc(self) -> UnaryExpression:
         return self.UnaryExpression(self, 'ASC')
 
 
 class BinaryOperationMixin(object):
+    BinaryExpression: Type[BinaryExpression]
 
     def __add__(self, other):
         return self.BinaryExpression(self, other, '+')

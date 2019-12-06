@@ -1,4 +1,12 @@
+from __future__ import annotations
+
+from abc import ABC
 from functools import wraps
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from olo.field import Field, ConstField
+
 from olo.compat import long, str_types
 from olo.interfaces import SQLASTInterface
 from olo.mixins.operations import BinaryOperationMixin
@@ -16,14 +24,14 @@ def _auto_transform_to_bin_exp(func):
     return wrapper
 
 
-class Expression(SQLASTInterface):
+class Expression(SQLASTInterface, ABC):
     def __neg__(self):
         return  # pragma: no cover
 
 
 class UnaryExpression(Expression):
 
-    def __init__(self, value, operator):
+    def __init__(self, value: Union[BinaryExpression, Field], operator: str) -> None:
         self.value = value
         self.operator = operator
 
@@ -41,7 +49,8 @@ class UnaryExpression(Expression):
         return self.__class__(self.value, op)  # pragma: no cover
 
 
-def transform_to_bin_exp(item):
+def transform_to_bin_exp(item: Union[BinaryExpression, bool, int, long, float, str]) -> Union[BinaryExpression,
+                                                                                              ConstField]:
     from olo.field import ConstField
     from olo import funcs
 
@@ -109,10 +118,15 @@ class BinaryExpression(Expression, BinaryOperationMixin):
         else:
             left_sql_ast = ['VALUE', self.left]  # pragma: no cover
 
+        right_sql_ast = []
         if isinstance(self.right, SQLASTInterface):
             right_sql_ast = self.right.get_sql_ast()
         else:
-            right_sql_ast = ['VALUE', self.right]
+            if self.operator in ('IN', 'NOT IN'):
+                if isinstance(self.right, (tuple, list)):
+                    right_sql_ast = ['VALUE', tuple(tuple(x) if isinstance(x, list) else x for x in self.right)]
+            else:
+                right_sql_ast = ['VALUE', self.right]
 
         return sql_ast + [left_sql_ast] + [right_sql_ast]
 

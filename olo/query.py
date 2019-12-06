@@ -1,7 +1,17 @@
+from __future__ import annotations
+
 import re
 import sys
 import types
 import operator
+from typing import TYPE_CHECKING, Optional, List
+
+from olo.expression import UnaryExpression
+from olo.funcs import DISTINCT
+
+if TYPE_CHECKING:
+    from olo.database import OLOCursor
+    from olo.model import Model
 
 from itertools import chain
 from decorator import decorator
@@ -34,7 +44,7 @@ def _dict_to_expressions(model_class, dct):
     ]
 
 
-def _process_order_by(model_class, order_by):
+def _process_order_by(model_class, order_by) -> List[UnaryExpression]:
     new = []
     for item in order_by:
         if isinstance(item, str_types):
@@ -50,7 +60,7 @@ def _process_order_by(model_class, order_by):
                     _item = _strip_backquote(_item)
             f = getattr(model_class, _item, None)
             if f is None:
-                raise OrderByError('`{}` is a valid order_by'.format(  # noqa pragma: no cover pylint: disable=W
+                raise OrderByError('`{}` is an invalid order_by'.format(  # noqa pragma: no cover pylint: disable=W
                     item
                 ))
             item = f
@@ -58,6 +68,13 @@ def _process_order_by(model_class, order_by):
                 item = item.desc()
             else:
                 item = item.asc()
+        elif isinstance(item, Field):
+            item = item.asc()
+        else:
+            if not isinstance(item, UnaryExpression):
+                raise OrderByError('`{}` is an invalid order_by'.format(  # noqa pragma: no cover pylint: disable=W
+                    item
+                ))
         new.append(item)
     return new
 
@@ -92,14 +109,14 @@ def _detect_table_alias(table_section, rev_alias_mapping=None):
 
 class Query(SQLASTInterface):
 
-    def __init__(self, model_class):
+    def __init__(self, model_class: Model):
         self._model_class = model_class
         self._expressions = []
         self._having_expressions = []
         self._on_expressions = []
         self._offset = 0
         self._limit = None
-        self._order_by = []
+        self._order_by: List[UnaryExpression] = []
         self._group_by = []
         self._entities = [model_class]
         self._raw = False
@@ -278,20 +295,43 @@ class Query(SQLASTInterface):
     __len__ = count
 
     def update(self, **values):
+        from olo import PostgreSQLDataBase
+
         expression = self._get_expression()
         if not expression:
             raise ExpressionError('Cannot execute update because of '
                                   'without expression')
-        expressions, _, _ = self._model_class._split_attrs(values)
+        assignments, _, _ = self._model_class._split_attrs(values)
 
-        sql_ast = [
+        update_sql_ast = [
             'UPDATE',
             ['TABLE', self.table_name],
             ['SET',
-             ['SERIES'] + [exp.get_sql_ast() for exp in expressions]]
+             ['SERIES'] + [asg.get_sql_ast() for asg in assignments]],
         ]
-        with self.db.transaction():
-            rows = self._get_rv(base_sql_ast=sql_ast)
+
+        db = self._model_class._get_db()
+
+        # FIXME(PG)
+        if isinstance(db, PostgreSQLDataBase):
+            pk = self._model_class.get_singleness_pk_field()
+            if self._order_by:
+                base_sql_ast, alias_mapping = self.map(pk).for_update()._get_base_sql_ast()
+                sql_ast = self.get_sql_ast(
+                    base_sql_ast=base_sql_ast,
+                    alias_mapping=alias_mapping,
+                )
+                update_sql_ast.append(
+                    ['WHERE', ['BINARY_OPERATE', 'IN', ['QUOTE', pk.name], ['BRACKET', sql_ast]]]
+                )
+                with self.db.transaction():
+                    rows = self._get_rv_by_sql_ast(sql_ast=update_sql_ast)
+            else:
+                with self.db.transaction():
+                    rows = self._get_rv(base_sql_ast=update_sql_ast)
+        else:
+            with self.db.transaction():
+                rows = self._get_rv(base_sql_ast=update_sql_ast)
         return rows
 
     def delete(self):
@@ -327,7 +367,9 @@ class Query(SQLASTInterface):
             base_sql_ast=base_sql_ast,
             alias_mapping=alias_mapping,
         )
+        return self._get_rv_by_sql_ast(sql_ast, cursor=cursor)
 
+    def _get_rv_by_sql_ast(self, sql_ast, cursor: Optional[OLOCursor] = None):
         if cursor is not None:
             cursor.ast_execute(sql_ast)
             return cursor.fetchall()
@@ -347,6 +389,17 @@ class Query(SQLASTInterface):
         with table_alias_mapping_context(alias_mapping):
             return self._get_primitive_sql_ast(base_sql_ast)
 
+    def _entities_contains(self, field):
+        if len(self._entities) == 1 and self._entities[0] is self._model_class:
+            return True
+        for f in self._entities:
+            # f == field will return an Expression object, so must compare with True explicitly
+            if (f == field) is True:
+                return True
+            if getattr(f, 'name', 'f.name') == getattr(field, 'name', 'field.name'):
+                return True
+        return False
+
     def _get_primitive_sql_ast(self, base_sql_ast):
         sql_ast = list(base_sql_ast)  # copy ast
         if self._on_expressions:
@@ -362,6 +415,10 @@ class Query(SQLASTInterface):
 
         if self._group_by:
             fields = self._get_fields(self._group_by)
+            pk = self._model_class.get_singleness_pk_field()
+            # self._entities must casting to set or pk in self._entities will always be True!!!
+            if self._entities_contains(pk):
+                fields.append(pk)
             sql_ast.append([
                 'GROUP BY',
                 ['SERIES'] + [f.get_sql_ast() for f in fields]
@@ -428,6 +485,18 @@ class Query(SQLASTInterface):
         else:
             table_section = ['TABLE', self.table_name]
 
+        contains_distinct = False
+        for entity in entities:
+            if isinstance(entity, DISTINCT):
+                contains_distinct = True
+                break
+
+        # FIXME(PG)
+        if contains_distinct and self._order_by:
+            for ob in self._order_by:
+                if not self._entities_contains(ob.value):
+                    entities = entities + [ob.value]
+
         rev_alias_mapping = {}
         table_section = _detect_table_alias(
             table_section,
@@ -446,9 +515,7 @@ class Query(SQLASTInterface):
             if modifier is not None:
                 select_ast = ['MODIFIER', modifier, select_ast]
 
-        sql_ast = ['SELECT']
-        sql_ast.append(select_ast)
-        sql_ast.append(['FROM', table_section])
+        sql_ast = ['SELECT', select_ast, ['FROM', table_section]]
         return sql_ast, alias_mapping
 
     # pylint: disable=E0602
@@ -502,10 +569,19 @@ class Query(SQLASTInterface):
 
         session = QuerySession()
 
+        seen = set()
+
         for idx, item in enumerate(rv):
             new_item = tuple(imap(lambda f: f(item), producers))  # noqa pylint: disable=W
+            new_item = new_item[:entity_count]
+
             if entity_count == 1:
                 new_item = new_item[0]
+                # TODO
+                if isinstance(self._entities[0], DISTINCT):
+                    if new_item in seen:
+                        continue
+                    seen.add(new_item)
 
             session.add_entity(new_item)
 

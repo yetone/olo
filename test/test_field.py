@@ -170,7 +170,7 @@ class TestField(TestCase):
             'BINARY_OPERATE',
             'NOT IN',
             ['COLUMN', 'foo', 'age'],
-            ['VALUE', [1]]
+            ['VALUE', (1,)]
         ])
         f = UnionField(Foo.age, Foo.id)
         exp = f.not_in_([1])
@@ -181,7 +181,7 @@ class TestField(TestCase):
             ['BRACKET',
              ['COLUMN', 'foo', 'age'],
              ['COLUMN', 'foo', 'id']],
-            ['VALUE', [1]]
+            ['VALUE', (1,)]
         ])
 
     def test_like_(self):

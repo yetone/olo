@@ -7,12 +7,15 @@ from copy import copy
 from datetime import date, datetime
 from functools import wraps
 from itertools import chain, product
+from typing import Tuple, List, Dict
+
+from six import with_metaclass
 
 from olo._speedups import decrypt_attrs, parse_attrs
 from olo.cache import CacheWrapper, delete_cache
 from olo.cached_query import CachedQuery
 from olo.compat import (str_types, iteritems, iterkeys, itervalues, izip,
-                        long, reduce, get_values, with_metaclass, xrange)
+                        long, reduce, get_values, xrange)
 from olo.context import Context, context, model_instantiate_context
 from olo.errors import DeparseError, ExpressionError, InvalidFieldError
 from olo.events import after_delete, after_insert, after_update, before_update
@@ -23,6 +26,7 @@ from olo.field import BaseField, DbField, Field, UnionField
 from olo.funcs import RAND
 from olo.key import StrKey
 from olo.query import Query
+from olo.statement import Assignment
 from olo.utils import (cached_property, camel2underscore, deprecation,
                        friendly_repr, missing, override,
                        readonly_cached_property, type_checker)
@@ -681,7 +685,7 @@ class Model(with_metaclass(ModelMeta)):
             need_updates[k] = res
 
         attrs = dict(need_updates, **attrs)
-        expressions, sql_attrs, db_attrs = self._split_attrs(attrs)
+        assignments, sql_attrs, db_attrs = self._split_attrs(attrs)
 
         sql_attrs = self._validate_attrs(sql_attrs, decrypt=False)
         db_attrs = self._validate_attrs(db_attrs, decrypt=False)
@@ -701,7 +705,7 @@ class Model(with_metaclass(ModelMeta)):
             self._rollback()
             return False
 
-        if expressions:
+        if assignments:
             expression = self.unique_expression
             if expression is None:
                 raise ExpressionError('Cannot update this instance because of '  # noqa pragma: no cover
@@ -712,7 +716,7 @@ class Model(with_metaclass(ModelMeta)):
                 'UPDATE',
                 ['TABLE', self._get_table_name()],
                 ['SET',
-                 ['SERIES'] + [exp.get_sql_ast() for exp in expressions]],
+                 ['SERIES'] + [asg.get_sql_ast() for asg in assignments]],
                 ['WHERE'] + [expression.get_sql_ast()]
             ]
 
@@ -720,7 +724,7 @@ class Model(with_metaclass(ModelMeta)):
                 db.ast_execute(sql_ast)
 
             dynamic_exps = [
-                exp for exp in expressions if isinstance(exp.right, Expression)
+                asg for asg in assignments if isinstance(asg.right, Expression)
             ]
             if dynamic_exps:
                 keys = list(map(lambda x: x.left.attr_name, dynamic_exps))
@@ -843,8 +847,8 @@ class Model(with_metaclass(ModelMeta)):
         return getattr(cls, attr_name)
 
     @classmethod
-    def _split_attrs(cls, attrs, collect_expression=True):
-        expressions = []
+    def _split_attrs(cls, attrs, collect_assignment=True) -> Tuple[List[Assignment], Dict, Dict]:
+        assignments = []
         sql_attrs = {}
         db_attrs = {}
         for k, v in iteritems(attrs):
@@ -853,11 +857,11 @@ class Model(with_metaclass(ModelMeta)):
             elif k in cls.__fields__:
                 if not isinstance(v, Expression):
                     sql_attrs[k] = v
-                if collect_expression:
-                    f = getattr(cls, k)
+                if collect_assignment:
+                    f: Field = getattr(cls, k)
                     v = cls._deparse_attrs({k: v})[k]
-                    expressions.append(BinaryExpression(f, v, '='))
-        return expressions, sql_attrs, db_attrs
+                    assignments.append(Assignment(f, v))
+        return assignments, sql_attrs, db_attrs
 
     @classmethod
     def _check_attrs(cls, attrs):
@@ -907,6 +911,7 @@ class Model(with_metaclass(ModelMeta)):
 
         before_create_is_instance_method = getattr(self.before_create, '__self__', None) is self  # noqa pylint: disable=C
 
+        bcr = True
         if before_create_is_instance_method:
             bcr = self.before_create()
 
@@ -916,7 +921,8 @@ class Model(with_metaclass(ModelMeta)):
         if not before_create_is_instance_method:
             bcr = self.before_create(**attrs)  # pragma: no cover
 
-        if bcr is False:
+        # bcr will be none so must compare with False!!!
+        if bcr is False:  # noqa
             return False
 
         self._validate_attrs(attrs, parse=True,
@@ -924,27 +930,28 @@ class Model(with_metaclass(ModelMeta)):
 
         db = self._get_db()
 
-        expressions, _, _ = self._split_attrs(sql_attrs)
+        assignments, _, _ = self._split_attrs(sql_attrs)
 
-        if expressions:
+        if assignments:
             fields_ast = ['BRACKET']
             values_ast = ['VALUES']
 
-            for exp in expressions:
-                fields_ast.append(exp.left.get_sql_ast())
-                values_ast.append(['VALUE', exp.right])
+            for asg in assignments:
+                fields_ast.append(['QUOTE', asg.left.name])
+                values_ast.append(['VALUE', asg.right])
+
+            pk_name = self.get_singleness_pk_name()
 
             sql_ast = [
                 'INSERT',
                 ['TABLE', self._get_table_name()],
                 fields_ast,
-                values_ast
+                values_ast,
+                ['RETURNING', pk_name],
             ]
 
             with db.transaction():
                 id_ = db.ast_execute(sql_ast)
-
-            pk_name = self.get_singleness_pk_name()
 
             if (
                     hasattr(self.__class__, pk_name) and

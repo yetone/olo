@@ -1,9 +1,10 @@
 import math
 
+from six import with_metaclass
+
 from olo.interfaces import SQLASTInterface
 from olo.mixins.operations import BinaryOperationMixin
 from olo.utils import missing
-from olo.compat import with_metaclass
 from olo.errors import SupportError
 
 
