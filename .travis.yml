@@ -1,10 +1,7 @@
 language: python
 
 python:
-  - "2.7"
   - "3.8"
-
-install: pip install tox-travis
 
 env:
   - MYSQL_USER=travis MYSQL_PASSWORD=
@@ -24,7 +21,7 @@ before_script:
 
 script:
   - pylint --rcfile=.pylintrc olo
-  - tox
+  - pytest --cov=olo
 
 after_success:
   - codecov
