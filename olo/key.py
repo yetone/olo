@@ -6,7 +6,7 @@ class Key(tuple):
         if PY2:
             super(Key, self).__init__(*args, **kwargs)  # pragma: no cover
         else:
-            super().__init__()  # pragma: no cover pylint: disable=missing-super-argument
+            super().__init__()  # pragma: no cover
         self.hashed_value = self.get_hashed_value()
 
     def get_hashed_value(self):

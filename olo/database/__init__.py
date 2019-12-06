@@ -219,7 +219,7 @@ class BaseDataBase(object):
 
         ast = ['CREATE_TABLE', False, True, model._get_table_name()]
 
-        create_difinition_ast = ['CREATE_DEFINITION']
+        create_definition_ast = ['CREATE_DEFINITION']
         for k in model.__sorted_fields__:
             f = getattr(model, k)
 
@@ -229,12 +229,10 @@ class BaseDataBase(object):
                 f.auto_increment, f.deparse
             ]
 
-            create_difinition_ast.append(f_schema_ast)
+            create_definition_ast.append(f_schema_ast)
 
-        create_difinition_ast.append([
-            'KEY', 'PRIMARY', None, [
-                x for x in model.__primary_key__
-            ]
+        create_definition_ast.append([
+            'KEY', 'PRIMARY', None, list(model.__primary_key__)
         ])
 
         for key in model.__index_keys__:
@@ -248,7 +246,7 @@ class BaseDataBase(object):
             else:
                 if not names:
                     continue
-                create_difinition_ast.append([
+                create_definition_ast.append([
                     'KEY', 'INDEX', key_name, names
                 ])
 
@@ -263,11 +261,11 @@ class BaseDataBase(object):
             else:
                 if not names:
                     continue  # pragma: no cover
-                create_difinition_ast.append([
+                create_definition_ast.append([
                     'KEY', 'UNIQUE', key_name, names
                 ])
 
-        ast.append(create_difinition_ast)
+        ast.append(create_definition_ast)
 
         table_options_ast = ['TABLE_OPTIONS']
         if model._options.table_engine is not None:
