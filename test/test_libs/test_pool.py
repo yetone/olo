@@ -32,7 +32,7 @@ class TestPool(TestCase):
         conn.expire_time = time.time()
         conn1 = db.pool.acquire_conn()
         db.pool.release_conn(conn1)
-        self.assertNotEquals(conn.id, conn1.id)
+        self.assertNotEqual(conn.id, conn1.id)
         self.assertEqual(db.pool.active_size, 0)
         self.assertEqual(db.pool.idle_size, 1)
 
