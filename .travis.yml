@@ -1,7 +1,6 @@
 language: python
 
 python:
-  - "2.7"
   - "3.8"
 
 env:
@@ -18,7 +17,7 @@ before_script:
   - mysql -e 'grant all on *.* to travis@localhost'
   - pip install -r requirements.txt
   - pip install -r test-requirements.txt
-  - pip install pylint==2.3.1 codecov
+  - pip install pylint==1.9.4 codecov
 
 script:
   - pylint --rcfile=.pylintrc olo
