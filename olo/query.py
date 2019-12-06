@@ -348,7 +348,7 @@ class Query(SQLASTInterface):
             return self._get_primitive_sql_ast(base_sql_ast)
 
     def _get_primitive_sql_ast(self, base_sql_ast):
-        sql_ast = [x for x in base_sql_ast]
+        sql_ast = list(base_sql_ast)  # copy ast
         if self._on_expressions:
             sql_ast.append([
                 'ON',
