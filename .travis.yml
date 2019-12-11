@@ -5,12 +5,15 @@ python:
 
 env:
   - MYSQL_USER=travis MYSQL_PASSWORD=
-  - PGSQL_USER=postgres PGSQL_USER=
+  - DB=pg PGSQL_USER=postgres PGSQL_USER=
 
 services:
   - mysql
   - postgresql
   - memcached
+
+addons:
+  mariadb: '10.0'
 
 before_script:
   - mysql -e 'set global innodb_large_prefix=1'
@@ -25,7 +28,6 @@ before_script:
 
 script:
   - pylint --rcfile=.pylintrc olo
-  - DB=pg pytest
   - pytest --cov=olo
 
 after_success:
