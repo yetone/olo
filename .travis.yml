@@ -4,22 +4,13 @@ python:
   - "3.8"
 
 env:
-  - MYSQL_USER=travis MYSQL_PASSWORD=
   - DB=pg PGSQL_USER=postgres PGSQL_USER=
 
 services:
-  - mysql
   - postgresql
   - memcached
 
-addons:
-  mariadb: '10.0'
-
 before_script:
-  - mysql -e 'set global innodb_large_prefix=1'
-  - mysql -e 'drop database if exists test_olo'
-  - mysql -e 'create database test_olo'
-  - mysql -e 'grant all on *.* to travis@localhost'
   - psql -c 'drop database if exists test_olo;' -U postgres
   - psql -c 'create database test_olo;' -U postgres
   - pip install -r requirements.txt
