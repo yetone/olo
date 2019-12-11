@@ -413,14 +413,14 @@ class BaseDataBase(object):
         self._do_beansdb_commands()
 
     def commit(self):
-        res = self.sql_commit()
+        res = self.sql_commit()  # pylint: disable=assignment-from-no-return
         self.commit_beansdb()
         self._run_lazy_funcs()
         self._run_commit_handlers()
         return res
 
     def rollback(self):
-        res = self.sql_rollback()
+        res = self.sql_rollback()  # pylint: disable=assignment-from-no-return
         self._local.pop_beansdb_transaction()
         self._local.clear_lazy_funcs()
         self._run_rollback_handlers()
