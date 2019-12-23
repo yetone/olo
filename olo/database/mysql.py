@@ -1,30 +1,27 @@
 from threading import Timer
 
-from olo.compat import Empty, Queue
-
-from olo.libs.pool import Pool, ConnProxy
+from olo.database import BaseDataBase, MySQLCursor
 from olo.libs.class_proxy import ClassProxy
-
-from olo.utils import ThreadedObject, parse_execute_sql
-from olo.database import BaseDataBase, OLOCursor
+from olo.libs.pool import Pool, ConnProxy
 
 
 def create_conn(host, port, user, password, dbname, charset):
     try:
         from MySQLdb import connect
         conn = connect(  # pragma: no cover
-            host=host, user=user, passwd=password, db=dbname,
+            host=host, port=port, user=user, passwd=password, db=dbname,
             charset=charset,
         )
     except ImportError:
-        from pymysql import connect
+        try:
+            from pymysql import connect
+        except ImportError:  # pragma: no cover
+            raise Exception(  # pragma: no cover
+                'Cannot found pymsql, please install it: pip install PyMySQL'
+            )
         conn = connect(
-            host=host, user=user, password=password, db=dbname,
+            host=host, port=port, user=user, password=password, db=dbname,
             charset=charset,
-        )
-    except ImportError:  # pragma: no cover
-        raise Exception(  # pragma: no cover
-            'Cannot found pymsql, please install it: pip install PyMySQL'
         )
     return conn
 
@@ -38,7 +35,8 @@ class MySQLConnProxy(ConnProxy):
         self.waiting_for_close = False
 
     def __str__(self):
-        return '<MySQLConnProxy {}>'.format(  # pragma: no cover
+        return '<{} {}>'.format(  # pragma: no cover
+            self.__class__.__name__,
             super(MySQLConnProxy, self).__str__()
         )
 
@@ -69,6 +67,9 @@ class MySQLConnProxy(ConnProxy):
             self.modified_cursors.remove(cur)
             if self.waiting_for_close:
                 self.close()  # pragma: no cover
+
+    def ping(self):
+        return self.conn.ping()
 
 
 class CursorProxy(ClassProxy):
@@ -130,7 +131,6 @@ class MySQLDataBase(BaseDataBase):
             max_active_size=max_active_size,
             max_idle_size=max_idle_size,
         )
-        self.modified_cursors = ThreadedObject(Queue)
 
     def get_conn(self):
         return self.pool.acquire_conn()
@@ -144,63 +144,4 @@ class MySQLDataBase(BaseDataBase):
             conn = tran.conn = self.get_conn()
 
         cur = conn.cursor()
-        return OLOCursor(cur, self)
-
-    def sql_execute(self, sql, params=None, **kwargs):  # pylint: disable=W
-        cmd = None
-        try:
-            cmd, _ = parse_execute_sql(sql)
-        except Exception:  # pragma: no cover pylint: disable=W
-            pass  # pragma: no cover
-        cur = self.get_cursor()
-        res = cur.execute(sql, params, **kwargs)
-        self.modified_cursors.put_nowait(cur)
-        if cmd == 'select':
-            return cur.fetchall()
-        cur.is_modified = True
-        if (
-            not kwargs.get('executemany') and
-            cmd == 'insert' and cur.lastrowid
-        ):
-            return cur.lastrowid
-        return res
-
-    def sql_commit(self):
-        first_err = None
-        commited = set()
-        while not self.modified_cursors.empty():
-            try:
-                cur = self.modified_cursors.get_nowait()
-                try:
-                    if cur.conn not in commited:
-                        commited.add(cur.conn)
-                        cur.conn.commit()
-                        self.log('COMMIT')
-                    cur.is_modified = False
-                except Exception as e:  # pragma: no cover pylint: disable=W
-                    if first_err is None:  # pragma: no cover
-                        first_err = e  # pragma: no cover
-            except Empty:  # pragma: no cover
-                pass  # pragma: no cover
-        if first_err is not None:
-            raise first_err  # pragma: no cover pylint: disable=E
-
-    def sql_rollback(self):
-        first_err = None
-        rollbacked = set()
-        while not self.modified_cursors.empty():
-            try:
-                cur = self.modified_cursors.get_nowait()
-                try:
-                    if cur.conn not in rollbacked:
-                        rollbacked.add(cur.conn)
-                        cur.conn.rollback()
-                        self.log('ROLLBACK')
-                    cur.is_modified = False
-                except Exception as e:  # pragma: no cover pylint: disable=W
-                    if first_err is None:  # pragma: no cover
-                        first_err = e  # pragma: no cover
-            except Empty:  # pragma: no cover
-                pass  # pragma: no cover
-        if first_err is not None:
-            raise first_err  # pragma: no cover pylint: disable=E
+        return MySQLCursor(cur, self)

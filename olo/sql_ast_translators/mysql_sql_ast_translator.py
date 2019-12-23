@@ -62,8 +62,8 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
 
     def post_COLUMN(self, table_name, field_name):
         if table_name is None:
-            return '`{}`'.format(field_name), []
-        return '`{}`.`{}`'.format(table_name, field_name), []
+            return self.post_QUOTE(field_name)
+        return '{}.{}'.format(self.post_QUOTE(table_name)[0], self.post_QUOTE(field_name)[0]), []
 
     def post_ALIAS(self, raw, alias):
         if context.alias_only:
@@ -105,8 +105,14 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
     def post_VALUE(self, value):
         return '%s', [value]
 
+    def post_QUOTE(self, value):
+        return '`{}`'.format(value), []
+
     def post_TABLE(self, table_name):
-        return '`{}`'.format(table_name), []
+        return self.post_QUOTE(table_name)
+
+    def post_RETURNING(self, field_name):
+        return '', []
 
     def post_CALL(self, func_name, *args):
         sql_pieces, params = self.reduce(args)
@@ -209,6 +215,13 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         sql_pieces.append('END')
         return ' '.join(sql_pieces), params
 
+    def post_CREATE_INDEX(self, if_not_exists, idx_name, tbl_name, field_names):
+        sql = (
+            f"CREATE INDEX {'IF NOT EXISTS ' if if_not_exists else ''} {self.post_QUOTE(idx_name)[0]} "
+            f"ON {self.post_TABLE(tbl_name)[0]} ({', '.join(self.post_QUOTE(name)[0] for name in field_names)})"
+        )
+        return sql, []
+
     def post_CREATE_TABLE(self, tmp, if_not_exists, tbl_name,
                           create_definition_ast, tbl_options_ast):
         sql_piece = 'CREATE '
@@ -217,7 +230,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         sql_piece += 'TABLE '
         if if_not_exists:
             sql_piece += 'IF NOT EXISTS '
-        sql_piece += '`{}` '.format(tbl_name)
+        sql_piece += self.post_TABLE(tbl_name)[0]
         _sql_piece, params = self.translate(create_definition_ast)
         sql_piece = sql_piece + '(\n' + _sql_piece + '\n)'
         _sql_piece, _params = self.translate(tbl_options_ast)
@@ -227,14 +240,13 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
 
     def post_CREATE_DEFINITION(self, *args):
         sql_pieces, params = self.reduce(args)
-        return ',\n'.join('  {}'.format(p) for p in sql_pieces), params
+        return ',\n'.join('  {}'.format(p) for p in sql_pieces if p), params
 
     def post_FIELD(self, name, type_,
                    length, charset, default,
                    noneable, auto_increment, deparse):
         # pylint: disable=too-many-statements
-        f_schema = '`{}`'.format(name)
-        f_type = ''
+        f_schema = self.post_QUOTE(name)[0]
         if type_ in (int, long):
             if length is not None:
                 if length < 2:
@@ -289,17 +301,17 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
     def post_KEY(self, type_, name, field_names):
         if type_ == 'PRIMARY':
             return 'PRIMARY KEY ({})'.format(', '.join(
-                '`{}`'.format(x) for x in field_names
+                self.post_QUOTE(x)[0] for x in field_names
             )), []
         if type_ == 'INDEX':
-            return 'INDEX `{}` ({})'.format(
-                name,
-                ', '.join('`{}`'.format(x) for x in field_names)
+            return 'INDEX {} ({})'.format(
+                self.post_QUOTE(name)[0],
+                ', '.join(self.post_QUOTE(x)[0] for x in field_names)
             ), []
         if type_ == 'UNIQUE':
-            return 'UNIQUE KEY `{}` ({})'.format(
-                name,
-                ', '.join('`{}`'.format(x) for x in field_names)
+            return 'UNIQUE KEY {} ({})'.format(
+                self.post_QUOTE(name)[0],
+                ', '.join(self.post_QUOTE(x)[0] for x in field_names)
             ), []
         raise NotImplementedError('key type: {}'.format(type_))
 

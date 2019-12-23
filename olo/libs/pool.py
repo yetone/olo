@@ -77,6 +77,9 @@ class ConnProxy(object):
     def __exit__(self, *exc):
         self.release()
 
+    def ping(self):
+        raise NotImplementedError
+
 
 class Pool(object):
     def __init__(self,
@@ -124,16 +127,21 @@ class Pool(object):
 
     @log_pool('acquire conn: {%ret}')
     def acquire_conn(self):
+        count = 0
         while True:
             with self.lock:
                 if self.idle_conns:
                     conn = self.idle_conns.pop(0)
                     if not self.ping_conn(conn):
+                        if count > 10:
+                            raise Exception('cannot get a alive connection!')
                         # FIXME
                         try:
                             self.destroy_conn(conn)
                         except Exception:
                             pass
+                        count += 1
+                        time.sleep(0.5)
                         return self.acquire_conn()
                     if conn.is_expired or conn.is_closed:
                         self.destroy_conn(conn)

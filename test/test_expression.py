@@ -27,7 +27,7 @@ class TestBinaryExpression(TestCase):
             'BINARY_OPERATE',
             'IN',
             ['COLUMN', 'dummy', 'id'],
-            ['VALUE', [1, 2]]
+            ['VALUE', (1, 2)]
         ])
         cond = (Dummy.id > 1) & ((Dummy.age == 3) | (Dummy.age == 2))
         ast = cond.get_sql_ast()
@@ -146,7 +146,7 @@ class TestBinaryExpression(TestCase):
             'BINARY_OPERATE',
             'IN',
             ['COLUMN', 'dummy', 'age'],
-            ['VALUE', [1, 2]]
+            ['VALUE', (1, 2)]
         ])
         a = Dummy.age.alias('xixi')
         exp = a == 1
@@ -186,7 +186,7 @@ class TestBinaryExpression(TestCase):
             ['BRACKET',
              ['COLUMN', 'dummy', 'age'],
              ['COLUMN', 'dummy', 'id']],
-            ['VALUE', [1]]
+            ['VALUE', (1,)]
         ])
         exp = Dummy.id.in_(Foo.query('id').filter(Foo.age > 2))
         ast = exp.get_sql_ast()
@@ -261,7 +261,7 @@ class TestBinaryExpression(TestCase):
             ['BINARY_OPERATE',
              'NOT IN',
              ['COLUMN', 'dummy', 'age'],
-             ['VALUE', [1, 2]]]
+             ['VALUE', (1, 2)]]
         )
         exp = Dummy.age.in_([1, 2]) == True  # noqa
         self.assertEqual(
@@ -269,7 +269,7 @@ class TestBinaryExpression(TestCase):
             ['BINARY_OPERATE',
              'IN',
              ['COLUMN', 'dummy', 'age'],
-             ['VALUE', [1, 2]]]
+             ['VALUE', (1, 2)]]
         )
         exp = Dummy.age.not_in_([1, 2]) == False  # noqa
         self.assertEqual(
@@ -277,7 +277,7 @@ class TestBinaryExpression(TestCase):
             ['BINARY_OPERATE',
              'IN',
              ['COLUMN', 'dummy', 'age'],
-             ['VALUE', [1, 2]]]
+             ['VALUE', (1, 2)]]
         )
         exp = (Dummy.age == 1) == False  # noqa
         self.assertEqual(

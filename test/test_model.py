@@ -170,7 +170,7 @@ class TestModel(TestCase):
         self.assertEqual(len(dummys), 2)
         dummys = Dummy.gets_by(order_by=Dummy.age.desc())
         self.assertEqual(dummys[0].age, 6)
-        dummys = Dummy.gets_by(group_by=Dummy.age)
+        dummys = Dummy.gets_by(order_by=Dummy.age)
         self.assertEqual(dummys[0].age, 1)
 
     def test_get(self):

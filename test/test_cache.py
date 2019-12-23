@@ -619,9 +619,9 @@ class TestCache(TestCase):
         self.assertEqual(foos, [])
 
         # test unique key
-        foos = Foo.cache.gets_by(name=1, age=1)
+        foos = Foo.cache.gets_by(name='1', age=1)
         self.assertEqual(len(foos), 1)
-        foos = Foo.cache.gets_by(name=100, age=1)
+        foos = Foo.cache.gets_by(name='100', age=1)
         self.assertEqual(foos, [])
 
     def test_gets_by_with_order_by(self):

@@ -1,8 +1,12 @@
 # coding=utf-8
+from __future__ import annotations
 
 import json
 from copy import copy
 from collections import defaultdict
+from typing import TYPE_CHECKING, Optional
+if TYPE_CHECKING:
+    from olo.model import Model
 
 from olo.compat import int_types, iteritems, izip, str_types
 from olo.interfaces import SQLASTInterface
@@ -66,11 +70,12 @@ class BaseField(object):
         self.charset = charset
         self._alias_name = None
         self._model_ref = lambda: None
+        self.AES_KEY = ''
 
     def __hash__(self):
         return self.id
 
-    def get_model(self):
+    def get_model(self) -> Optional[Model]:
         if not self._model_ref:
             return
         return self._model_ref()
@@ -103,7 +108,7 @@ class BaseField(object):
         except (TypeError, ValueError):
             return value
 
-    def is_primary_key(self):
+    def is_primary_key(self) -> bool:
         return self._primary_key
 
     def validate(self, value):

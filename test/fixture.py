@@ -18,7 +18,10 @@ MAX_CONN = 103
 in_travis = os.environ.get('ENV') == 'travis'
 
 
+is_pg = os.getenv('DB') == 'pg'
 SCHEMA_FILE = 'schema.sql'
+if is_pg:
+    SCHEMA_FILE = 'schema_pg.sql'
 BEANSDB_CFG = {
     'localhost:11211': range(16),
 }
@@ -28,6 +31,12 @@ MYSQL_USER = os.getenv('MYSQL_USER', 'root')
 MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
 MYSQL_DB = 'test_olo'
 MYSQL_CHARSET = 'utf8mb4'
+
+PGSQL_HOST = 'localhost'
+PGSQL_PORT = 5432
+PGSQL_USER = os.getenv('PGSQL_USER', 'root')
+PGSQL_PASSWORD = os.getenv('PGSQL_PASSWORD', '')
+PGSQL_DB = 'test_olo'
 
 
 created_tables = False
@@ -54,7 +63,21 @@ def init_tables():
         create_tables(cur)
 
 
+def get_postgresql_conn():
+    from psycopg2 import connect
+    return connect(
+        host=PGSQL_HOST,
+        port=PGSQL_PORT,
+        user=PGSQL_USER,
+        password=PGSQL_PASSWORD,
+        database=PGSQL_DB
+    )
+
+
 def get_mysql_conn():
+    if is_pg:
+        return get_postgresql_conn()
+
     try:
         from pymysql import connect
     except ImportError:
@@ -77,9 +100,10 @@ def setup_mysql_conn():
         mysql_conn.close()
 
     mysql_conn = get_mysql_conn()
-    cur = mysql_conn.cursor()
-    cur.execute('SET GLOBAL sql_mode = ""')
-    mysql_conn.commit()
+    if not is_pg:
+        cur = mysql_conn.cursor()
+        cur.execute('SET GLOBAL sql_mode = ""')
+        mysql_conn.commit()
 
 
 def rollback_all():
@@ -123,14 +147,20 @@ def _clear_beansdb_for_test():
 
 
 def get_all_tables(cur):
-    cur.execute('SHOW TABLES')
+    if is_pg:
+        cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+    else:
+        cur.execute('SHOW TABLES')
     return [table for table, in cur]
 
 
 def drop_tables(cur, tables):
     logger.info('drop all tables')
     for table in tables:
-        cur.execute('DROP TABLE `%s`' % table)
+        if is_pg:
+            cur.execute('DROP TABLE "%s"' % table)
+        else:
+            cur.execute('DROP TABLE `%s`' % table)
     cur.connection.commit()
 
 
@@ -145,7 +175,10 @@ def create_tables(cursor):
 
 def truncate_tables(cur, tables):
     for table in tables:
-        cur.execute('TRUNCATE TABLE `%s`' % table)
+        if is_pg:
+            cur.execute('TRUNCATE TABLE "%s" RESTART IDENTITY' % table)
+        else:
+            cur.execute('TRUNCATE TABLE `%s`' % table)
     cur.connection.commit()
 
 
@@ -182,21 +215,12 @@ class TestCase(unittest.TestCase):
         rollback_all()
 
         cur = mysql_conn.cursor()
-        cur.execute('SET FOREIGN_KEY_CHECKS = 0')
+        if not is_pg:
+            cur.execute('SET FOREIGN_KEY_CHECKS = 0')
 
         tables = get_all_tables(cur)
 
         truncate_tables(cur, tables)
-
-        # initialize tables data
-        # for sqlfile in get_data_files():
-        #     for sql in get_sqls(open(sqlfile)):
-        #         try:
-        #             cur.execute(sql)
-        #         except Exception as e:
-        #             logger.warn('Error running %s', sqlfile)
-        #             logger.warn(e)
-        #             raise
 
         cur.connection.commit()
 
@@ -227,14 +251,6 @@ def get_data_files():
             if not sqlfile.endswith(SCHEMA_FILE)]
 
 
-NO_MEM_TABLES = set(['user', 'user_alias'])
-RE_ENGINE = re.compile(r'(?i)(?<= ENGINE=)(\w+)(?=\s|$)')
-RE_BLOB = re.compile(r'(?i)(?<=` )(\w*text|blob)(?=\s|,)')
-RE_FULLTEXT = re.compile(r'(?im)(,\n\s*FULLTEXT KEY[^,\n]*)(?=,|\n)')
-RE_TABLE_OPTIONS = re.compile(r'(ROW_FORMAT|KEY_BLOCK_SIZE)=\S+')
-RE_TABLE = re.compile(r'^CREATE TABLE\s*`([\w-]+)`')
-
-
 def change_memory_engine(sql, blob_length=3000):
     return sql
 
@@ -247,7 +263,7 @@ RE_FULLTEXT = re.compile(r'(?im)(,\n\s*FULLTEXT KEY[^,\n]*)(?=,|\n)')
 
 
 def remove_fulltext_key(sql):
-    # `FULLTEXT indexes are supported only for MyISAM tables ...'
+    # "FULLTEXT indexes are supported only for MyISAM tables ...'
     #  -- http://dev.mysql.com/doc/refman/5.0/en/create-index.html
     # so remove fulltext key
     return RE_FULLTEXT.sub('', sql)
