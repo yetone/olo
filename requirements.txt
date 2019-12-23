@@ -1,7 +1,7 @@
 blinker==1.4
 pycryptodomex==3.6.5
 dill==0.2.5
-dateparser==0.3.5
+dateparser==0.7.2
 futures==3.0.5
 decorator==4.2.1
 pymysql==0.9.1
