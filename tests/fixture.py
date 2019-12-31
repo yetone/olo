@@ -8,7 +8,7 @@ import logging
 import unittest
 
 import libmc
-from test.libs.beansdb import BeansDBProxy
+from tests.libs.beansdb import BeansDBProxy
 from olo.compat import PY2
 
 
@@ -107,7 +107,7 @@ def setup_mysql_conn():
 
 
 def rollback_all():
-    from test.base import db
+    from tests.base import db
     with db.transaction():
         db.rollback()
     db.pool.clear_conns()

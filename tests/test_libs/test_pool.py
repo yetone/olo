@@ -3,7 +3,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from test.base import TestCase, db, Foo
+from tests.base import TestCase, db, Foo
 
 
 class TestPool(TestCase):

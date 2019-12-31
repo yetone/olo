@@ -42,6 +42,6 @@ orig_execute = db.execute
 orig_db_get = db.db_get
 orig_db_get_multi = db.db_get_multi
 
-patched_execute = patch('test.base.db.execute', side_effect=orig_execute)
-patched_db_get = patch('test.base.db.db_get', side_effect=orig_db_get)
-patched_db_get_multi = patch('test.base.db.db_get_multi', side_effect=orig_db_get_multi)
+patched_execute = patch('tests.base.db.execute', side_effect=orig_execute)
+patched_db_get = patch('tests.base.db.db_get', side_effect=orig_db_get)
+patched_db_get_multi = patch('tests.base.db.db_get_multi', side_effect=orig_db_get_multi)

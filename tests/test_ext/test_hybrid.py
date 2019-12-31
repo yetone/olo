@@ -1,8 +1,8 @@
 from olo.ext.hybrid import hybrid_property
-from test.base import Dummy as _Dummy
-from test.base import Foo as _Foo
-from test.base import TestCase
-from test.utils import patched_execute
+from tests.base import Dummy as _Dummy
+from tests.base import Foo as _Foo
+from tests.base import TestCase
+from tests.utils import patched_execute
 
 
 class Dummy(_Dummy):

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from olo import MySQLDataBase, PostgreSQLDataBase, Model, Field, DbField
 from olo.debug import set_debug
-from test.fixture import (  # noqa pylint:disable=W
+from tests.fixture import (  # noqa pylint:disable=W
     TestCase, mc, beansdb,
     init_tables,
     MYSQL_HOST, MYSQL_PORT,
