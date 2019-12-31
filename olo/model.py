@@ -495,7 +495,7 @@ class ModelMeta(type):
         return cls._options.query_class(cls)
 
     @readonly_cached_property
-    def cache(cls):
+    def cache(cls) -> CacheWrapper:
         return cls._options.cache_class(cls)
 
     @readonly_cached_property
