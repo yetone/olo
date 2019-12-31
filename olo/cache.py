@@ -8,6 +8,7 @@ from olo.compat import izip, str_types, iteritems
 from olo.events import after_delete, after_insert, after_update, before_update
 from olo.key import StrKey
 from olo.errors import CacheError
+from olo.logger import logger
 from olo.session import QuerySession
 from olo.utils import missing, friendly_repr
 
@@ -249,6 +250,7 @@ class CacheWrapper(object):
         over_limit = start + limit > self.MAX_COUNT
 
         res = self._cache_client.get(key)
+        logger.debug('[CACHE]: get cache by key: %s, value: %s', key, res)
         if res is None:
             res = self._model_class.get_entities_by(
                 [pk_name],
