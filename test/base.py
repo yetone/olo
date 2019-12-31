@@ -119,7 +119,7 @@ class Foo(BaseModel):
     prop1 = DbField(list, noneable=True)
 
     __unique_keys__ = (
-        ('name', 'age'),
+        (name, 'age'),
         ('key',)
     )
 
@@ -140,7 +140,7 @@ class Bar(BaseModel):
 
     __index_keys__ = (
         (),
-        ('xixi', 'age'),
+        ('xixi', age),
         'age'
     )
 
