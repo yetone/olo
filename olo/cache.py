@@ -252,7 +252,7 @@ class CacheWrapper(object):
             return [inst]
 
         index_keys = get_index_keys(self._model_class)
-        if self._model_class.__name__ == 'Bar' and kwargs.get('name') == 'e':
+        if getattr(self._model_class, 'fuck', False):
             logger.debug(old_kwargs)
             logger.debug('[FUCK]: %s, str_key: %s, str_key in: %s, order_by: %s, order_by in: %s', index_keys, str_key, str_key in index_keys, order_by, order_by in self._model_class.__order_bys__)
         if (
@@ -293,8 +293,8 @@ class CacheWrapper(object):
             self._cache_client.set(key, res)
 
         if len(res) == self.MAX_COUNT + 1 and over_limit:
-            if self._model_class.__name__ == 'Bar' and kwargs.get('name') == 'e':
-                logger.debug('[FUCK]: %s', res)
+            if getattr(self._model_class, 'fuck', False):
+                logger.debug('[FUCK]: res: %s', res)
             return fallback()
 
         return self.gets(res[start: start + limit])
