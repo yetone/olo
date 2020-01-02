@@ -606,6 +606,7 @@ class TestCache(TestCase):
         with patched_execute as execute:
             Bar.fuck = True
             bars = Bar.cache.gets_by(name='e')
+            Bar.fuck = False
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
 

@@ -225,6 +225,8 @@ class CacheWrapper(object):
     @wash_kwargs
     def get_multi_by(self, *args, **kwargs):
         old_kwargs = dict(kwargs)
+        if getattr(self._model_class, 'fuck', False):
+            logger.debug('[FUCK]: args: %s, kwargs: %s', args, kwargs)
 
         def fallback():
             self._report_miss('get_multi_by', *args, **old_kwargs)
