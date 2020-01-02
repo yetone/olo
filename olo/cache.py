@@ -38,7 +38,10 @@ class CacheClientWrapper:
 
     def get(self, key: str) -> Any:
         logger.debug('[CACHE]: get %s', key)
-        return self.cli.get(key)
+        value = self.cli.get(key)
+        if key == "olo:db:bar:(name='e'):v0.1.1:suffix:_olo_data":
+            logger.debug('[FUCK] get %s, value: %s', key, value)
+        return value
 
     def get_multi(self, keys: List[str]) -> Any:
         logger.debug('[CACHE]: get multi %s', keys)
@@ -50,6 +53,8 @@ class CacheClientWrapper:
 
     def set_multi(self, mapping: Any) -> None:
         logger.debug('[CACHE]: set multi %s', mapping)
+        if "olo:db:bar:(name='e'):v0.1.1:suffix:_olo_data" in mapping:
+            logger.debug('[FUCK] set multi!!!!!')
         return self.cli.set_multi(mapping)
 
 
