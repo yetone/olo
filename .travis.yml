@@ -19,7 +19,7 @@ before_script:
 
 script:
   - pylint --rcfile=.pylintrc olo
-  - pytest --cov=olo
+  - pytest --cov=olo -s tests/test_cache.py
 
 after_success:
   - codecov
