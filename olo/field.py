@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from copy import copy
 from collections import defaultdict
+from enum import Enum
 from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from olo.model import Model
@@ -27,7 +28,7 @@ class BaseField(object):
 
     id = 0
 
-    def __init__(self, type,
+    def __init__(self, type_,
                  default=None, name=None,
                  parser=None, deparser=None,
                  primary_key=False, on_update=None,
@@ -45,7 +46,7 @@ class BaseField(object):
         self.id = self.__class__.id + 1
         self.__class__.id = self.id
 
-        self.type = type
+        self.type = type_
         self.name = name
         self.default = default
         self._parser = (
@@ -71,6 +72,9 @@ class BaseField(object):
         self._alias_name = None
         self._model_ref = lambda: None
         self.AES_KEY = ''
+
+        if self.choices is None and isinstance(self.type, type) and issubclass(self.type, Enum):
+            self.choices = self.type
 
     def __hash__(self):
         return self.id

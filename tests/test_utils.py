@@ -3,6 +3,7 @@
 import pickle
 
 from datetime import datetime, date
+from enum import Enum
 
 from olo.compat import PY2, Decimal, unicode
 from olo.utils import (
@@ -14,6 +15,12 @@ from .base import TestCase
 
 class A(object):
     name = 'A'
+
+
+class AEnum(Enum):
+    A = 0
+    B = 1
+    C = 2
 
 
 class TestUtils(TestCase):
@@ -84,6 +91,8 @@ class TestUtils(TestCase):
         with self.assertRaises(TypeError):
             transform_type('[1]', {})
         self.assertEqual(transform_type("1", "string"), "1")
+        self.assertEqual(transform_type('A', AEnum), AEnum.A)
+        self.assertEqual(transform_type(AEnum.B, str), 'B')
 
     def test_missing(self):
         self.assertTrue(Missing() == Missing())

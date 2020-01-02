@@ -274,22 +274,22 @@ class TestQuery(TestCase):
         q = Foo.query.join(Dummy).on(Foo.age == Dummy.age)
         res = q.all()
         self.assertEqual(len(res), 5)
-        self.assertEqual([x.name for x in res], [
+        self.assertEqual({x.name for x in res}, {
             'foo2', 'foo3', 'foo4', 'foo5', 'foo6'
-        ])
+        })
         q = Dummy.query.join(Foo).on(Foo.age == Dummy.age)
         res = q.all()
         self.assertEqual(len(res), 5)
-        self.assertEqual([x.name for x in res], [
+        self.assertEqual({x.name for x in res}, {
             'dummy0', 'dummy0', 'dummy1', 'dummy1', 'dummy1'
-        ])
+        })
         q = Dummy.query.join(Foo).on(Foo.age == Dummy.age,
                                      Dummy.age == 6)
         res = q.all()
         self.assertEqual(len(res), 3)
-        self.assertEqual([x.name for x in res], [
+        self.assertEqual({x.name for x in res}, {
             'dummy1', 'dummy1', 'dummy1'
-        ])
+        })
         q = Dummy.query(DISTINCT(Dummy.id)).join(Foo).on(
             Foo.age == Dummy.age
         ).order_by(

@@ -38,7 +38,7 @@ class TestPool(TestCase):
 
     def test_release(self):
         Foo.create(name='foo', age=12, key='a')
-        with ThreadPoolExecutor(max_workers=100) as exe:
-            list(exe.map(Foo._get, range(100)))
+        with ThreadPoolExecutor(max_workers=10) as exe:
+            list(exe.map(Foo._get, range(10)))
         self.assertEqual(db.pool.active_size, 0)
         self.assertEqual(db.pool.idle_size, db.pool.max_idle_size)
