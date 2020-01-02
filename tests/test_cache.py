@@ -1,5 +1,5 @@
 # coding: utf-8
-
+from olo.logger import logger
 from .base import db, TestCase, Dummy, Foo, Bar, Lala
 from .utils import (
     auto_use_cache_ctx, patched_execute, no_cache_client,
@@ -449,9 +449,10 @@ class TestCache(TestCase):
             bars = Bar.cache.gets_by(xixi='b', age=1, limit=11)
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
-        bar = Bar.create(name='b', xixi='b', age=1)
-        bar = Bar.create(name='c', xixi='b', age=1)
-        bar = Bar.create(name='d', xixi='b', age=1)
+        bar.update(word='a')
+        bar = Bar.create(name='b', xixi='b', age=1, word='b')
+        bar = Bar.create(name='c', xixi='b', age=1, word='c')
+        bar = Bar.create(name='d', xixi='b', age=1, word='d')
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, limit=11)
             self.assertEqual(len(bars), 4)
@@ -532,74 +533,78 @@ class TestCache(TestCase):
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
-                                     limit=2, order_by=('-age', 'xixi'))
+                                     limit=2, order_by=('-age', 'word'))
             self.assertEqual(len(bars), 1)
             self.assertTrue(execute.called)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
-                                     limit=2, order_by=('-age', 'xixi'))
+                                     limit=2, order_by=('-age', 'word'))
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
 
         with patched_execute as execute:
             with auto_use_cache_ctx(Bar):
                 bars = Bar.gets_by(xixi='b', age=1, start=3,
-                                   limit=2, order_by=('-age', 'xixi'))
+                                   limit=2, order_by=('-age', 'word'))
                 self.assertEqual(len(bars), 1)
                 self.assertFalse(execute.called)
 
         _bar = bars[0]
         _bar.update(xixi='c')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=2,
-                                     limit=2, order_by=('-age', 'xixi'))
+                                     limit=2, order_by=('-age', 'word'))
             self.assertEqual(len(bars), 1)
             self.assertTrue(execute.called)
 
         _bar.update(xixi='e')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=2,
-                                     order_by=('-age', 'xixi'))
+                                     order_by=('-age', 'word'))
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
 
         _bar.update(xixi='b')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
-                                     limit=2, order_by=('xixi', 'age'))
+                                     limit=2, order_by=('word', 'age'))
             self.assertEqual(len(bars), 1)
             self.assertTrue(execute.called)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
-                                     limit=2, order_by=('xixi', 'age'))
+                                     limit=2, order_by=('word', 'age'))
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
 
         _bar.update(xixi='e')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=2,
-                                     order_by=('-age', 'xixi'))
+                                     order_by=('-age', 'word'))
             self.assertEqual(len(bars), 1)
             self.assertTrue(execute.called)
 
-        Bar.create(name='e', xixi='b', age=1)
-        Bar.create(name='f', xixi='b', age=1)
+        Bar.create(name='e', xixi='b', age=1, word='e')
+        Bar.create(name='f', xixi='b', age=1, word='f')
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
-                                     limit=2, order_by=('xixi', 'age'))
+                                     limit=2, order_by=('word', 'age'))
             self.assertEqual(len(bars), 2)
             self.assertTrue(execute.called)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
-                                     limit=2, order_by=['xixi', 'age'])
+                                     limit=2, order_by=['word', 'age'])
             self.assertEqual(len(bars), 2)
             self.assertFalse(execute.called)
 
