@@ -159,8 +159,8 @@ class Bar(BaseModel):
 
     __order_bys__ = (
         'xixi',
-        ('xixi', 'age'),
-        ('-age', 'xixi'),
+        ('word', 'age'),
+        ('-age', 'word'),
     )
 
     def get_uuid(self):
