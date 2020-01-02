@@ -3,6 +3,7 @@ import random
 import logging
 
 from functools import wraps
+from typing import Any, List
 
 from olo.compat import izip, str_types, iteritems
 from olo.events import after_delete, after_insert, after_update, before_update
@@ -10,7 +11,7 @@ from olo.key import StrKey
 from olo.errors import CacheError
 from olo.logger import logger
 from olo.session import QuerySession
-from olo.utils import missing, friendly_repr
+from olo.utils import missing, friendly_repr, cached_property
 
 
 def wash_kwargs(func):
@@ -23,19 +24,46 @@ def wash_kwargs(func):
     return _
 
 
+class CacheClientWrapper:
+    def __init__(self, model_class):
+        self._model_class = model_class
+
+    def __bool__(self):
+        return bool(self.cli)
+
+    __nonzero__ = __bool__
+
+    @property
+    def cli(self):
+        return self._model_class._options.cache_client
+
+    def get(self, key: str) -> Any:
+        logger.debug('[CACHE]: get %s', key)
+        return self.cli.get(key)
+
+    def get_multi(self, keys: List[str]) -> Any:
+        logger.debug('[CACHE]: get multi %s', keys)
+        return self.cli.get_multi(keys)
+
+    def set(self, key: str, value: Any) -> None:
+        logger.debug('[CACHE]: set %s = %s', key, value)
+        return self.cli.set(key, value)
+
+    def set_multi(self, mapping: Any) -> None:
+        logger.debug('[CACHE]: set multi %s', mapping)
+        return self.cli.set_multi(mapping)
+
+
 class CacheWrapper(object):
     MAX_COUNT = 200
 
     def __init__(self, model_class):
         self._model_class = model_class
+        self._cache_client = CacheClientWrapper(model_class)
 
     @property
     def _db(self):
         return self._model_class._options.db
-
-    @property
-    def _cache_client(self):
-        return self._model_class._options.cache_client
 
     @property
     def _gen_cache_key(self):

@@ -1,10 +1,12 @@
 # coding=utf-8
+import logging
 from datetime import datetime, date
 from enum import Enum
 from uuid import uuid4
 
 from olo import MySQLDataBase, PostgreSQLDataBase, Model, Field, DbField
 from olo.debug import set_debug
+from olo.logger import logger
 from tests.fixture import (  # noqa pylint:disable=W
     TestCase, mc, beansdb,
     init_tables,
@@ -18,6 +20,7 @@ from tests.fixture import (  # noqa pylint:disable=W
 
 #init_tables()
 set_debug(True)
+logger.setLevel(logging.DEBUG)
 if is_pg:
     db = PostgreSQLDataBase(
         PGSQL_HOST, PGSQL_PORT,
