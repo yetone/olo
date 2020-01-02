@@ -2,7 +2,7 @@ from olo.field import ConstField, UnionField
 from olo.errors import ValidationError, DbFieldVersionError
 from olo.compat import xrange
 
-from .base import TestCase, Dummy, Foo
+from .base import TestCase, Dummy, Foo, Gender
 from .utils import patched_db_get, patched_db_get_multi
 
 
@@ -275,6 +275,10 @@ class TestField(TestCase):
             self.assertEqual(table_name, None)
         finally:
             Foo.age._model_ref = model_ref
+
+    def test_enum(self):
+        d = Dummy.create(gender='MALE')
+        self.assertEqual(d.gender, Gender.MALE)
 
 
 class TestConstField(TestCase):

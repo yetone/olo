@@ -1,10 +1,11 @@
 # coding=utf-8
 from datetime import datetime, date
+from enum import Enum
 from uuid import uuid4
 
 from olo import MySQLDataBase, PostgreSQLDataBase, Model, Field, DbField
 from olo.debug import set_debug
-from test.fixture import (  # noqa pylint:disable=W
+from tests.fixture import (  # noqa pylint:disable=W
     TestCase, mc, beansdb,
     init_tables,
     MYSQL_HOST, MYSQL_PORT,
@@ -15,7 +16,7 @@ from test.fixture import (  # noqa pylint:disable=W
     PGSQL_DB,
     is_pg)
 
-init_tables()
+#init_tables()
 set_debug(True)
 if is_pg:
     db = PostgreSQLDataBase(
@@ -60,6 +61,11 @@ class BaseModel(_BaseModel):
         )
 
 
+class Gender(Enum):
+    FEMALE = 0
+    MALE = 1
+
+
 class Dummy(BaseModel):
     id = Field(int, primary_key=True, length=11, auto_increment=True)
     name = Field(str, noneable=True, default='dummy', length=255,
@@ -71,8 +77,9 @@ class Dummy(BaseModel):
     tags = Field([str], default=[])
     payload = Field({str: [int]}, noneable=True, default={})
     foo = Field(int, noneable=True, length=11)
-    dynasty = Field(str, default='现代', length=4)
+    dynasty = Field(str, default='现代', length=4, charset='utf8mb4')
     dynasty1 = Field(str, noneable=True, length=4)
+    gender = Field(Gender, default=Gender.FEMALE)
     created_at = Field(
         datetime,
         default=datetime.now
@@ -119,7 +126,7 @@ class Foo(BaseModel):
     prop1 = DbField(list, noneable=True)
 
     __unique_keys__ = (
-        ('name', 'age'),
+        (name, 'age'),
         ('key',)
     )
 
@@ -138,9 +145,12 @@ class Bar(BaseModel):
     word = Field(str, noneable=True, length=255)
     prop1 = DbField(list, noneable=True)
 
+    class Options:
+        table_charset = 'utf8mb4'
+
     __index_keys__ = (
         (),
-        ('xixi', 'age'),
+        ('xixi', age),
         'age'
     )
 

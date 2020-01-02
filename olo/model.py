@@ -495,7 +495,7 @@ class ModelMeta(type):
         return cls._options.query_class(cls)
 
     @readonly_cached_property
-    def cache(cls):
+    def cache(cls) -> CacheWrapper:
         return cls._options.cache_class(cls)
 
     @readonly_cached_property
@@ -1251,20 +1251,24 @@ class Model(with_metaclass(ModelMeta)):
         for k, v in iteritems(attrs):
             field = getattr(cls, k)
             is_field = isinstance(field, Field)
-            if not isinstance(v, Expression):
-                if v is not None or not field.noneable:
-                    if is_field and not isinstance(v, VALID_TYPES):
-                        v = field.deparse(v)
-                    if is_field and not isinstance(v, VALID_TYPES):
-                        raise DeparseError(  # pragma: no cover
-                            'The deparsed type of {}.{} is invalid. '
-                            'Type: {}; Value: {}. '
-                            'Please check the deparser of this field.'.format(
-                                cls.__name__, k, type(v), repr(v)
-                            )
-                        )
-                    v = field.encrypt_func(v) if field.encrypt else v
-                    v = field.input(v) if field.input else v
+            if isinstance(v, Expression):
+                res[k] = v
+                continue
+            if v is None and field.noneable:
+                res[k] = v
+                continue
+            if is_field and not isinstance(v, VALID_TYPES):
+                v = field.deparse(v)
+            if is_field and not isinstance(v, VALID_TYPES):
+                raise DeparseError(  # pragma: no cover
+                    'The deparsed type of {}.{} is invalid. '
+                    'Type: {}; Value: {}. '
+                    'Please check the deparser of this field.'.format(
+                        cls.__name__, k, type(v), repr(v)
+                    )
+                )
+            v = field.encrypt_func(v) if field.encrypt else v
+            v = field.input(v) if field.input else v
             res[k] = v
         return res
 

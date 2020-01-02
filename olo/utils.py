@@ -4,6 +4,8 @@ import re
 import json
 import inspect
 import threading
+from enum import Enum
+
 import dateparser
 import logging
 from string import Formatter
@@ -116,11 +118,17 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
 def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
     if isinstance(type_, type) and isinstance(obj, type_):
         return obj
+    if isinstance(type_, type) and issubclass(type_, Enum):
+        if obj not in type_.__members__:
+            raise TypeError(f'{obj} is not a valid type of enum {type_}')
+        return getattr(type_, obj)
     if type_ is str:
         if isinstance(obj, unicode):
             return obj.encode('utf-8')  # pragma: no cover
         if isinstance(obj, (list, dict)):
             return json.dumps(obj)
+        if isinstance(obj, Enum):
+            return obj.name
         return type_(obj)
     if type_ is unicode:
         if isinstance(obj, str):  # pragma: no cover

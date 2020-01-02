@@ -27,7 +27,7 @@ class PostgreSQLCursor(OLOCursor):
             return
 
     def log(self, sql: str, params: Optional[Tuple] = None, level: int = logging.INFO) -> None:
-        logger.log(msg=self.mogrify(sql, params), level=level)
+        logger.log(msg=self.mogrify(sql, params).decode('utf8'), level=level)
 
 
 class PostgreSQLConnProxy(MySQLConnProxy):

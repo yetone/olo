@@ -1,3 +1,4 @@
+import logging
 import sys
 import time
 import threading
@@ -21,6 +22,7 @@ def log_pool(fmt):
     return log_call(
         '[POOL]: {}'.format(fmt),
         logger,
+        level=logging.DEBUG,
         toggle=(
             lambda *args, **kwargs:
             len(args) > 0 and getattr(args[0], 'enable_log', False)

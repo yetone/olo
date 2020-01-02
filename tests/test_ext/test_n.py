@@ -1,7 +1,7 @@
 from olo.ext.n import n
 
-from test.base import TestCase, Foo as _Foo, Bar
-from test.utils import patched_execute
+from tests.base import TestCase, Foo as _Foo, Bar
+from tests.utils import patched_execute
 
 
 def prefetch_factory(model_class, default=None):
