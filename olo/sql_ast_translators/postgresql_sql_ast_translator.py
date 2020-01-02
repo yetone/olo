@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from enum import Enum
 
 from olo.compat import Decimal, long, unicode
 from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator
@@ -38,6 +39,8 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
             f_type = 'DATE'
         elif type_ is datetime:
             f_type = 'TIMESTAMP'
+        elif isinstance(type_, type) and issubclass(type_, Enum):
+            f_type = 'VARCHAR(128)'
         else:
             f_type = 'TEXT'
 

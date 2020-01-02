@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from enum import Enum
 
 from olo.sql_ast_translators.sql_ast_translator import SQLASTTranslator
 from olo.context import context, alias_only_context
@@ -270,6 +271,8 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
             f_type = 'DATE'
         elif type_ is datetime:
             f_type = 'TIMESTAMP'
+        elif isinstance(type_, type) and issubclass(type_, Enum):
+            f_type = 'VARCHAR(128)'
         else:
             f_type = 'TEXT'
 
