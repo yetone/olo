@@ -253,7 +253,7 @@ class CacheWrapper(object):
 
         index_keys = get_index_keys(self._model_class)
         if self._model_class.__name__ == 'Bar':
-            logger.debug('[INDEX KEYS]: %s', index_keys)
+            logger.debug('[INDEX KEYS]: %s, str_key: %s, str_key in: %s, order_by: %s, order_by in: %s', index_keys, str_key, str_key in index_keys, order_by, order_by in self._model_class.__order_bys__)
         if (
             args or
             str_key not in index_keys or
