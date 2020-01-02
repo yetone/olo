@@ -1,5 +1,5 @@
 # coding: utf-8
-
+from olo.logger import logger
 from .base import db, TestCase, Dummy, Foo, Bar, Lala
 from .utils import (
     auto_use_cache_ctx, patched_execute, no_cache_client,
@@ -551,6 +551,7 @@ class TestCache(TestCase):
 
         _bar = bars[0]
         _bar.update(xixi='c')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=2,
@@ -559,6 +560,7 @@ class TestCache(TestCase):
             self.assertTrue(execute.called)
 
         _bar.update(xixi='e')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=2,
@@ -567,6 +569,7 @@ class TestCache(TestCase):
             self.assertFalse(execute.called)
 
         _bar.update(xixi='b')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
@@ -581,6 +584,7 @@ class TestCache(TestCase):
             self.assertFalse(execute.called)
 
         _bar.update(xixi='e')
+        logger.debug('[BAR]: %s', _bar)
 
         with patched_execute as execute:
             bars = Bar.cache.gets_by(xixi='b', age=1, start=2,
