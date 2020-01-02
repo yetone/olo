@@ -252,6 +252,8 @@ class CacheWrapper(object):
             return [inst]
 
         index_keys = get_index_keys(self._model_class)
+        if self._model_class.__name__ == 'Bar':
+            logger.debug('[INDEX KEYS]: %s', index_keys)
         if (
             args or
             str_key not in index_keys or
