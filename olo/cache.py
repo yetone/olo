@@ -55,6 +55,7 @@ class CacheClientWrapper:
         logger.debug('[CACHE]: set multi %s', mapping)
         r = self.cli.set_multi(mapping)
         if "olo:db:bar:(name='e'):v0.1.1:suffix:_olo_data" in mapping:
+            raise Exception('fuck')
             logger.debug('[FUCK] set multi!!!!!')
             v = self.get("olo:db:bar:(name='e'):v0.1.1:suffix:_olo_data")
             logger.debug('[FUCK] value is %s', v)

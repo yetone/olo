@@ -592,8 +592,10 @@ class TestCache(TestCase):
         Bar.create(name='f', xixi='b', age=1)
 
         with patched_execute as execute:
+            Bar.fuck = True
             bars = Bar.cache.gets_by(xixi='b', age=1, start=3,
                                      limit=2, order_by=('xixi', 'age'))
+            Bar.fuck = False
             self.assertEqual(len(bars), 2)
             self.assertTrue(execute.called)
 
