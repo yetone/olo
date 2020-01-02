@@ -1,17 +1,16 @@
-import sys
-import random
 import logging
-
+import random
+import sys
 from functools import wraps
 from typing import Any, List
 
 from olo.compat import izip, str_types, iteritems
+from olo.errors import CacheError
 from olo.events import after_delete, after_insert, after_update, before_update
 from olo.key import StrKey
-from olo.errors import CacheError
 from olo.logger import logger
 from olo.session import QuerySession
-from olo.utils import missing, friendly_repr, cached_property
+from olo.utils import missing, friendly_repr
 
 
 def wash_kwargs(func):
