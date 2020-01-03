@@ -158,9 +158,10 @@ class TestCachedQuery(TestCase):
             bars = Bar.cq.filter(xixi='b', age=1).limit(11).all()
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
-        bar = Bar.create(name='b', xixi='b', age=1)
-        bar = Bar.create(name='c', xixi='b', age=1)
-        bar = Bar.create(name='d', xixi='b', age=1)
+        bar.update(word='a')
+        bar = Bar.create(name='b', xixi='b', age=1, word='b')
+        bar = Bar.create(name='c', xixi='b', age=1, word='c')
+        bar = Bar.create(name='d', xixi='b', age=1, word='d')
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).limit(11).all()
             self.assertEqual(len(bars), 4)
@@ -208,14 +209,14 @@ class TestCachedQuery(TestCase):
 
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
-                '-age', 'xixi'
+                '-age', 'word'
             ).offset(3).limit(2).all()
             self.assertEqual(len(bars), 1)
             self.assertTrue(execute.called)
 
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
-                '-age', 'xixi'
+                '-age', 'word'
             ).offset(3).limit(2).all()
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
@@ -225,7 +226,7 @@ class TestCachedQuery(TestCase):
 
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
-                '-age', 'xixi'
+                '-age', 'word'
             ).offset(2).limit(2).all()
             self.assertEqual(len(bars), 1)
             self.assertTrue(execute.called)
@@ -234,31 +235,31 @@ class TestCachedQuery(TestCase):
 
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
-                'xixi', 'age'
+                'word', 'age'
             ).offset(3).limit(2).all()
             self.assertEqual(len(bars), 1)
             self.assertTrue(execute.called)
 
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
-                'xixi', 'age'
+                'word', 'age'
             ).offset(3).limit(2).all()
             self.assertEqual(len(bars), 1)
             self.assertFalse(execute.called)
 
-        Bar.create(name='e', xixi='b', age=1)
-        Bar.create(name='f', xixi='b', age=1)
+        Bar.create(name='e', xixi='b', age=1, word='e')
+        Bar.create(name='f', xixi='b', age=1, word='f')
 
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
-                'xixi', 'age'
+                'word', 'age'
             ).offset(3).limit(2).all()
             self.assertEqual(len(bars), 2)
             self.assertTrue(execute.called)
 
         with patched_execute as execute:
             bars = Bar.cq.filter(xixi='b', age=1).order_by(
-                'xixi', 'age'
+                'word', 'age'
             ).offset(3).limit(2).all()
             self.assertEqual(len(bars), 2)
             self.assertFalse(execute.called)
