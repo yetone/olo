@@ -196,16 +196,14 @@ class TestBinaryExpression(TestCase):
             ['COLUMN', 'dummy', 'id'],
             ['SELECT',
              ['SERIES',
-              ['COLUMN', 'f', 'id']],
+              ['COLUMN', 'foo', 'id']],
              ['FROM',
-              ['ALIAS',
-               ['TABLE', 'foo'],
-               'f'
-               ]],
+              ['TABLE', 'foo'],
+              ],
              ['WHERE',
               ['BINARY_OPERATE',
                '>',
-               ['COLUMN', 'f', 'age'],
+               ['COLUMN', 'foo', 'age'],
                ['VALUE', 2]]]]
         ])
 

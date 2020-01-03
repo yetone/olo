@@ -38,7 +38,7 @@ class TestFuncs(TestCase):
              ['SERIES',
               ['CALL', 'COUNT', 1]],
              ['FROM',
-              ['ALIAS', ['TABLE', 'dummy'], 'd']]]
+              ['TABLE', 'dummy']]]
         )
         self.assertEqual(
             funcs.COUNT(Dummy.query.filter(id=1)).get_sql_ast(),
@@ -46,11 +46,11 @@ class TestFuncs(TestCase):
              ['SERIES',
               ['CALL', 'COUNT', 1]],
              ['FROM',
-              ['ALIAS', ['TABLE', 'dummy'], 'd']],
+              ['TABLE', 'dummy']],
              ['WHERE',
               ['BINARY_OPERATE',
                '=',
-               ['COLUMN', 'd', 'id'],
+               ['COLUMN', 'dummy', 'id'],
                ['VALUE', 1]]]]
         )
         c = funcs.COUNT(1).alias('c')
@@ -158,11 +158,10 @@ class TestFuncs(TestCase):
              ['SERIES',
               ['CALL',
                'MAX',
-               ['COLUMN', 'd', 'id']]],
+               ['COLUMN', 'dummy', 'id']]],
              ['FROM',
-              ['ALIAS',
-               ['TABLE', 'dummy'],
-               'd']]]
+              ['TABLE', 'dummy'],
+              ]]
         )
 
     def test_min(self):
