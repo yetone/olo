@@ -5,6 +5,7 @@ import json
 import inspect
 import threading
 from enum import Enum
+from typing import List
 
 import dateparser
 import logging
@@ -376,11 +377,11 @@ def get_thread_ident():
     return threading.currentThread().ident
 
 
-def car(lst):
+def car(lst: List) -> str:
     return lst[0]
 
 
-def cdr(lst):
+def cdr(lst: List) -> List:
     return lst[1:]
 
 

@@ -1,3 +1,5 @@
+from typing import List, Dict, Tuple
+
 from olo.compat import iteritems
 from olo.context import context, table_alias_mapping_context, in_sql_translation_context
 from olo.utils import car, cdr, is_sql_ast
@@ -30,6 +32,16 @@ def _detect_table_alias(sql_ast, rev_alias_mapping=None):
             for x in sql_ast]
 
 
+def detect_table_alias(sql_ast: List) -> Tuple[List, Dict[str, str]]:
+    rev_alias_mapping = {}
+    sql_ast = _detect_table_alias(
+        sql_ast,
+        rev_alias_mapping=rev_alias_mapping
+    )
+    alias_mapping = {v: k for k, v in sorted(iteritems(rev_alias_mapping))}
+    return sql_ast, alias_mapping
+
+
 class SQLASTTranslator(object):
     def translate(self, sql_ast):
         if not is_sql_ast(sql_ast):
@@ -37,13 +49,7 @@ class SQLASTTranslator(object):
 
         alias_mapping = None
         if not context.in_sql_translation:
-            rev_alias_mapping = {}
-            sql_ast = _detect_table_alias(
-                sql_ast,
-                rev_alias_mapping=rev_alias_mapping
-            )
-
-            alias_mapping = {v: k for k, v in sorted(iteritems(rev_alias_mapping))}
+            sql_ast, alias_mapping = detect_table_alias(sql_ast)
 
         head = car(sql_ast)
         tail = cdr(sql_ast)
