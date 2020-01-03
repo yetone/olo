@@ -14,6 +14,8 @@ def _detect_table_alias(sql_ast, rev_alias_mapping=None):
         orig_alias = alias
         n = 0
         while alias in rev_alias_mapping:
+            if rev_alias_mapping[alias] == sql_ast[1]:
+                break
             n += 1
             alias = orig_alias + str(n)
         rev_alias_mapping[alias] = sql_ast[1]
