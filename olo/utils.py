@@ -385,7 +385,7 @@ def cdr(lst):
 
 
 def optimize_sexp(sexp):
-    if not isinstance(sexp, list):
+    if not is_sql_ast(sexp):
         return sexp
     head = car(sexp)
     tail = cdr(sexp)

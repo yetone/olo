@@ -29,9 +29,7 @@ class CachedQuery(Query):
     def _can_be_cached(self):  # pylint: disable=too-many-return-statements
         if self._having_expressions:
             return False
-        if self._on_expressions:
-            return False
-        if self._join:
+        if self._join_chain:
             return False
         if (
                 len(self._entities) != 1 or

@@ -320,15 +320,13 @@ class TestQuery(TestCase):
             q.get_sql_ast(),
             ['SELECT',
              ['SERIES',
-              ['COLUMN', 'd1', 'id']],
+              ['COLUMN', 'dummy', 'id']],
              ['FROM',
-              ['JOIN',
-               ['ALIAS',
-                ['TABLE', 'dummy'],
-                'd'],
-               ['ALIAS',
-                ['TABLE', 'dummy'],
-                'd1']]],
+              ['JOIN', 'INNER',
+               ['TABLE', 'dummy'],
+               ['TABLE', 'dummy'],
+               [],
+               ]],
              ]
         )
 
@@ -338,11 +336,9 @@ class TestQuery(TestCase):
             q.get_sql_ast(),
             ['SELECT',
              ['SERIES',
-              ['COLUMN', 'd', 'id']],
+              ['COLUMN', 'dummy', 'id']],
              ['FROM',
-              ['ALIAS',
-               ['TABLE', 'dummy'],
-               'd'],
+              ['TABLE', 'dummy'],
               ],
              ['FOR UPDATE']
              ]

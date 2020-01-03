@@ -100,3 +100,10 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
             'LIMIT {} OFFSET {}'.format(offset_sql_piece, limit_sql_piece),
             limit_params + offset_params
         )
+
+    def post_CREATE_ENUM(self, name, labels):
+        placeholders = ', '.join(['%s'] * len(labels))
+        return f'CREATE TYPE {name} ({placeholders})', labels
+
+    def post_ADD_ENUM_LABEL(self, name, pre_label, label):
+        return '', []

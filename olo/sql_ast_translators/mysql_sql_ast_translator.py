@@ -64,6 +64,8 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
     def post_COLUMN(self, table_name, field_name):
         if table_name is None:
             return self.post_QUOTE(field_name)
+        alias_mapping = context.table_alias_mapping or {}
+        table_name = alias_mapping.get(table_name, table_name)
         return '{}.{}'.format(self.post_QUOTE(table_name)[0], self.post_QUOTE(field_name)[0]), []
 
     def post_ALIAS(self, raw, alias):
@@ -79,28 +81,18 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
             sql_piece, params = self.translate(arg)
         return 'FROM {}'.format(sql_piece), params
 
-    def post_JOIN(self, left, right):
-        left_sql_piece, left_params = self.translate(left)
-        right_sql_piece, right_params = self.translate(right)
+    def post_JOIN(self, join_type, left_ast, right_ast, on_ast):
+        left_sql_piece, left_params = self.translate(left_ast)
+        right_sql_piece, right_params = self.translate(right_ast)
+        if not on_ast:
+            return (
+                f'{left_sql_piece} {join_type} JOIN {right_sql_piece}',
+                left_params + right_params
+            )
+        on_sql_piece, on_params = self.translate(on_ast)
         return (
-            '{} JOIN {}'.format(left_sql_piece, right_sql_piece),
-            left_params + right_params
-        )
-
-    def post_LEFT_JOIN(self, left, right):
-        left_sql_piece, left_params = self.translate(left)
-        right_sql_piece, right_params = self.translate(right)
-        return (
-            '{} LEFT JOIN {}'.format(left_sql_piece, right_sql_piece),
-            left_params + right_params
-        )
-
-    def post_RIGHT_JOIN(self, left, right):
-        left_sql_piece, left_params = self.translate(left)
-        right_sql_piece, right_params = self.translate(right)
-        return (
-            '{} RIGHT JOIN {}'.format(left_sql_piece, right_sql_piece),
-            left_params + right_params
+            f'{left_sql_piece} {join_type} JOIN {right_sql_piece} ON {on_sql_piece}',
+            left_params + right_params + on_params
         )
 
     def post_VALUE(self, value):
@@ -238,6 +230,12 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         params.extend(_params)
         sql_piece += ' ' + _sql_piece
         return sql_piece, params
+
+    def post_CREATE_ENUM(self, name, labels):
+        return '', []
+
+    def post_ADD_ENUM_LABEL(self, name, pre_label, label):
+        return '', []
 
     def post_CREATE_DEFINITION(self, *args):
         sql_pieces, params = self.reduce(args)

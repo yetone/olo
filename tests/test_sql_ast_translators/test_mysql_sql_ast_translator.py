@@ -13,17 +13,17 @@ class TestMySQLSQLASTTranslator(TestCase):
                 ['COLUMN', 'f', 'age']],
                ['FROM',
                 ['JOIN',
+                 'INNER',
                  ['ALIAS',
                   ['TABLE', 'bar'],
                   'b'],
                  ['ALIAS',
                   ['TABLE', 'foo'],
-                  'f']]],
-               ['ON',
-                ['BINARY_OPERATE',
-                 '=',
-                 ['COLUMN', 'b', 'age'],
-                 ['COLUMN', 'f', 'age']]],
+                  'f'],
+                 ['BINARY_OPERATE',
+                  '=',
+                  ['COLUMN', 'b', 'age'],
+                  ['COLUMN', 'f', 'age']]]],
                ['WHERE',
                 ['BINARY_OPERATE',
                  '<',
@@ -50,7 +50,7 @@ class TestMySQLSQLASTTranslator(TestCase):
                 ['VALUE', 10]]]
         self.assertEqual(
             tran.translate(ast),
-            ('SELECT `b`.`name`, `b`.`age`, `f`.`age` FROM `bar` AS b JOIN `foo` AS f ON `b`.`age` = `f`.`age` WHERE `b`.`age` < (SELECT MAX(`f`.`id`) FROM `foo` AS f) GROUP BY `b`.`age` ORDER BY `b`.`age` DESC LIMIT %s, %s',  # noqa
+            ('SELECT `b`.`name`, `b`.`age`, `f`.`age` FROM `bar` AS b INNER JOIN `foo` AS f ON `b`.`age` = `f`.`age` WHERE `b`.`age` < (SELECT MAX(`f`.`id`) FROM `foo` AS f) GROUP BY `b`.`age` ORDER BY `b`.`age` DESC LIMIT %s, %s',  # noqa
              [20, 10])
         )
 
