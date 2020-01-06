@@ -1,5 +1,5 @@
 # coding: utf-8
-
+from olo import funcs
 from olo.funcs import COUNT, SUM, AVG, MAX, DISTINCT
 from .base import TestCase, Foo, Bar, Dummy
 from .fixture import is_pg
@@ -395,7 +395,7 @@ class TestCachedQuery(TestCase):
         Dummy.create(name='foo2', age=2)
         Dummy.create(name='foo3', age=3)
         Dummy.create(name='foo4', age=3)
-        rv = Dummy.cq('age', 'count(1)').group_by('age').order_by('age').all()
+        rv = Dummy.cq('age', funcs.COUNT(1)).group_by('age').order_by('age').all()
         self.assertEqual(rv, [(1, 1), (2, 2), (3, 2)])
         rv = Dummy.cq('name', 'age').group_by('name', 'age').order_by('age').all()
         self.assertEqual(rv, [('foo0', 1), ('foo2', 2),

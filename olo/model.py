@@ -17,7 +17,7 @@ from olo.cached_query import CachedQuery
 from olo.compat import (str_types, iteritems, iterkeys, itervalues, izip,
                         long, reduce, get_values, xrange)
 from olo.context import Context, context, model_instantiate_context
-from olo.errors import DeparseError, ExpressionError, InvalidFieldError
+from olo.errors import DeparseError, ExpressionError, InvalidFieldError, ORMError
 from olo.events import after_delete, after_insert, after_update, before_update
 from olo.expression import BinaryExpression, Expression
 from olo.ext.exported import IS_EXPORTED_PROPERTY
@@ -1033,7 +1033,7 @@ class Model(with_metaclass(ModelMeta)):
             return  # pragma: no cover
         pk_dict = self._get_pk_dict()
         if not pk_dict:
-            raise Exception('No pk dict!!!')  # pragma: no cover
+            raise ORMError('No pk dict!!!')  # pragma: no cover
         values = self.__class__.query(*missing_fields).filter(
             **pk_dict
         ).first()

@@ -20,10 +20,10 @@ from decorator import decorator
 from olo.compat import izip, imap, str_types, iteritems, reduce
 from olo.interfaces import SQLASTInterface
 from olo.field import Field
-from olo.errors import ExpressionError, OrderByError, SupportError
+from olo.errors import ExpressionError, OrderByError, SupportError, ORMError
 from olo.libs.compiler.translators.func_translator import transform_func
 from olo.session import QuerySession
-from olo.utils import optimize_sql_ast
+from olo.utils import optimize_sql_ast, friendly_repr
 
 
 PATTERN_NEG = re.compile(r'^\-')
@@ -149,8 +149,9 @@ class Query(SQLASTInterface):
         for item in entities:
             if isinstance(item, str_types):
                 field = self._model_class._olo_get_field(item)
-                if field is not None:
-                    item = field
+                if field is None:
+                    raise ORMError(f'{friendly_repr(item)} is not a valid field in Model {self._model_class.__name__}')
+                item = field
             res.append(item)
         return res
 
@@ -247,7 +248,7 @@ class Query(SQLASTInterface):
     @_lambda_eval
     def on(self, *on_expressions, **on_expression_dict):
         if self._join_chain is None:
-            raise Exception('this query does not have a join chain!')
+            raise ORMError('this query does not have a join chain!')
 
         self._model_class._check_attrs(on_expression_dict)
         on_expression_dict = self._model_class._wash_attrs(

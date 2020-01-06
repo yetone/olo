@@ -4,6 +4,7 @@ import time
 import threading
 from functools import wraps
 
+from olo.errors import ORMError
 from olo.logger import logger
 from olo.utils import log_call
 
@@ -136,7 +137,7 @@ class Pool(object):
                     conn = self.idle_conns.pop(0)
                     if not self.ping_conn(conn):
                         if count > 10:
-                            raise Exception('cannot get a alive connection!')
+                            raise ORMError('cannot get a alive connection!')
                         # FIXME
                         try:
                             self.destroy_conn(conn)
@@ -154,7 +155,7 @@ class Pool(object):
                     time.sleep(self.tick_time)
                     _conn = self.active_conns[0]
                     if time.time() - _conn.expire_time + self.timeout >= self.wait_time:  # noqa
-                        raise Exception('wait to release connection too long!')
+                        raise ORMError('wait to release connection too long!')
                     continue
                 conn = self._create_conn()
                 self.active_conns.append(conn)

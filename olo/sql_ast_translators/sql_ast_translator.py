@@ -2,8 +2,8 @@ from typing import List, Dict, Tuple, Iterable, Optional
 
 from olo.compat import iteritems
 from olo.context import context, table_alias_mapping_context, in_sql_translation_context
-from olo.utils import car, cdr, is_sql_ast
-
+from olo.errors import ORMError
+from olo.utils import car, cdr, is_sql_ast, friendly_repr
 
 AST = List
 
@@ -48,7 +48,7 @@ def detect_table_alias(sql_ast: AST) -> Tuple[AST, Dict[str, str]]:
 class SQLASTTranslator(object):
     def translate(self, sql_ast: AST) -> Tuple[str, List]:
         if not is_sql_ast(sql_ast):
-            return '', []
+            raise ORMError(f'{friendly_repr(sql_ast)} is not a valid sql ast!')
 
         alias_mapping = None
         if not context.in_sql_translation:
