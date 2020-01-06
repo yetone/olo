@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import json
 import logging
+from enum import Enum
 from functools import wraps
 from queue import Queue, Empty
 from typing import TYPE_CHECKING, Optional, Tuple, Set, List
+
+from olo.sql_ast_translators.sql_ast_translator import AST
 
 if TYPE_CHECKING:
     from olo.model import Model
@@ -15,7 +18,7 @@ from olo.transaction import Transaction
 from olo.logger import logger
 from olo.errors import DataBaseError
 from olo.compat import str_types, unicode
-from olo.utils import to_camel_case, ThreadedObject, parse_execute_sql
+from olo.utils import to_camel_case, ThreadedObject, parse_execute_sql, camel2underscore
 from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator  # noqa
 from olo.field import BaseField
 
@@ -139,7 +142,7 @@ class BaseDataBase(object):
         self._tables = None
         self._index_rows_mapping = {}
         self.enable_log = False
-        self._models = []
+        self._models: List[Model] = []
         self.modified_cursors = ThreadedObject(Queue)
 
     def add_lazy_func(self, func):
@@ -214,38 +217,89 @@ class BaseDataBase(object):
                 return []  # pragma: no cover
         return self._index_rows_mapping[table_name]
 
-    def gen_tables_schema(self):
-        asts = [
-                   self.to_model_table_schema_sql_ast(m)
-                   for m in self._models
-               ] + sum(
-            (self.to_model_indexes_sql_asts(m) for m in self._models),
-            []
-        )
-        return self.ast_translator.translate(['PROGN'] + asts)[0]
+    def gen_tables_schemas(self):
+        asts = self.to_db_types_sql_asts() + self.to_db_table_schema_sql_asts() + self.to_db_indexes_sql_asts()
+        for ast in asts:
+            yield self.ast_translator.translate(ast)
+        # return self.ast_translator.translate(['PROGN'] + asts)[0]
 
-    @classmethod
-    def to_model_indexes_sql_asts(cls, model: Model):
+    def to_db_indexes_sql_asts(self) -> List[AST]:
         asts = []
 
-        for key in reduce_indexes(model.__index_keys__):
-            key_name = 'idx_' + '_'.join(map(to_camel_case, key))
-            names = []
-            for p in key:
-                f = getattr(model, p)
-                if not isinstance(f, BaseField):
-                    break  # pragma: no cover
-                names.append(f.name)
-            else:
-                if not names:
-                    continue
-                asts.append([
-                    'CREATE_INDEX', True, key_name, model._get_table_name(), names
-                ])
+        for model in self._models:
+            for key in reduce_indexes(model.__index_keys__):
+                key_name = 'idx_' + '_'.join(map(to_camel_case, key))
+                names = []
+                for p in key:
+                    f = getattr(model, p)
+                    if not isinstance(f, BaseField):
+                        break  # pragma: no cover
+                    names.append(f.name)
+                else:
+                    if not names:
+                        continue
+                    asts.append([
+                        'CREATE_INDEX', True, key_name, model._get_table_name(), names
+                    ])
         return asts
 
+    def to_db_types_sql_asts(self) -> List[AST]:
+        from olo.database.postgresql import PostgreSQLDataBase
+
+        asts = []
+
+        if not isinstance(self, PostgreSQLDataBase):
+            return asts
+
+        existing_enums = {}
+        with self.transaction():
+            rv = self.execute(
+                'select t.typname, e.enumlabel from pg_type as t join pg_enum as e on t.oid = e.enumtypid'
+            )
+            for name, label in rv:
+                existing_enums.setdefault(name, []).append(label)
+
+        seen = set()
+
+        for model in self._models:
+            for k in model.__sorted_fields__:
+                f = getattr(model, k)
+
+                if isinstance(f.type, type) and issubclass(f.type, Enum):
+                    enum_name = camel2underscore(f.type.__name__)
+
+                    if enum_name in seen:
+                        continue
+
+                    seen.add(enum_name)
+
+                    enum_labels = existing_enums.get(enum_name)
+
+                    if enum_labels is None:
+                        enum_labels = list(f.type.__members__)
+                        asts.append([
+                            'CREATE_ENUM',
+                            enum_name,
+                            enum_labels,
+                        ])
+                        continue
+
+                    for member_name in f.type.__members__:
+                        if member_name not in enum_labels:
+                            asts.append([
+                                'ADD_ENUM_LABEL',
+                                enum_name,
+                                enum_labels[-1] if enum_labels else '',
+                                member_name
+                            ])
+                            enum_labels.append(member_name)
+        return asts
+
+    def to_db_table_schema_sql_asts(self) -> List[AST]:
+        return [self._to_db_table_schema_sql_ast(m) for m in self._models]
+
     @classmethod
-    def to_model_table_schema_sql_ast(cls, model: Model):
+    def _to_db_table_schema_sql_ast(cls, model: Model) -> AST:
         # pylint: disable=too-many-statements
 
         ast = ['CREATE_TABLE', False, True, model._get_table_name()]
@@ -297,10 +351,9 @@ class BaseDataBase(object):
         return ast
 
     def create_all(self):
-        schema = self.gen_tables_schema()
         with self.transaction():
-            for sql in get_sqls(schema.split('\n')):
-                self.sql_execute(sql)
+            for sql, params in self.gen_tables_schemas():
+                self.sql_execute(sql, params)
 
     def register_model(self, model_cls):
         self._models.append(model_cls)
@@ -534,8 +587,8 @@ class DataBase(BaseDataBase):
             return cur  # pragma: no cover
         return MySQLCursor(cur, self)  # pragma: no cover
 
-    def gen_tables_schema(self):
-        raise NotImplementedError('not implement gen_tables_schema!')
+    def gen_tables_schemas(self):
+        raise NotImplementedError('not implement gen_tables_schemas!')
 
     def sql_execute(self, sql, params=None, **kwargs):
         self.log(sql, params)

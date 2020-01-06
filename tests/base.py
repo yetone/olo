@@ -67,6 +67,7 @@ class BaseModel(_BaseModel):
 class Gender(Enum):
     FEMALE = 0
     MALE = 1
+    OTHER = 2
 
 
 class Dummy(BaseModel):

@@ -1,11 +1,14 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, annotations
 
-import re
-import json
 import inspect
+import json
+import re
 import threading
 from enum import Enum
-from typing import List
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from olo.sql_ast_translators.sql_ast_translator import AST
 
 import dateparser
 import logging
@@ -377,11 +380,11 @@ def get_thread_ident():
     return threading.currentThread().ident
 
 
-def car(lst: List) -> str:
+def car(lst: AST) -> str:
     return lst[0]
 
 
-def cdr(lst: List) -> List:
+def cdr(lst: AST) -> AST:
     return lst[1:]
 
 
@@ -403,7 +406,7 @@ def optimize_sql_ast(sql_ast):
     return [optimize_sexp(sexp) for sexp in sql_ast]
 
 
-def is_sql_ast(lst):
+def is_sql_ast(lst: AST) -> bool:
     if not isinstance(lst, list) or not lst:
         return False
     if not isinstance(lst[0], str_types):

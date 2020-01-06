@@ -1,11 +1,14 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Iterable, Optional
 
 from olo.compat import iteritems
 from olo.context import context, table_alias_mapping_context, in_sql_translation_context
 from olo.utils import car, cdr, is_sql_ast
 
 
-def _detect_table_alias(sql_ast, rev_alias_mapping=None):
+AST = List
+
+
+def _detect_table_alias(sql_ast: AST, rev_alias_mapping: Optional[Dict[str, str]] = None) -> AST:
     if not is_sql_ast(sql_ast):
         return sql_ast
 
@@ -32,7 +35,7 @@ def _detect_table_alias(sql_ast, rev_alias_mapping=None):
             for x in sql_ast]
 
 
-def detect_table_alias(sql_ast: List) -> Tuple[List, Dict[str, str]]:
+def detect_table_alias(sql_ast: AST) -> Tuple[AST, Dict[str, str]]:
     rev_alias_mapping = {}
     sql_ast = _detect_table_alias(
         sql_ast,
@@ -43,9 +46,9 @@ def detect_table_alias(sql_ast: List) -> Tuple[List, Dict[str, str]]:
 
 
 class SQLASTTranslator(object):
-    def translate(self, sql_ast):
+    def translate(self, sql_ast: AST) -> Tuple[str, List]:
         if not is_sql_ast(sql_ast):
-            return sql_ast, []
+            return '', []
 
         alias_mapping = None
         if not context.in_sql_translation:
@@ -65,7 +68,7 @@ class SQLASTTranslator(object):
 
             return method(*tail)  # pylint: disable=not-callable
 
-    def reduce(self, args):
+    def reduce(self, args: Iterable[AST]) -> Tuple[List[str], List]:
         params = []
         sql_pieces = []
         for x in args:
