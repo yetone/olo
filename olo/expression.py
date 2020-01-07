@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from enum import Enum
 from functools import wraps
 from typing import TYPE_CHECKING, Union
 
@@ -80,6 +81,10 @@ class BinaryExpression(Expression, BinaryOperationMixin):
         self.left = left
         self.right = right
         self.operator = operator
+        if isinstance(self.right, Enum):
+            self.right = self.right.name
+        elif isinstance(self.right, type) and issubclass(self.right, Enum):
+            self.right = tuple(self.right.__members__)
 
     @_auto_transform_to_bin_exp
     def __and__(self, other):
