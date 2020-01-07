@@ -56,7 +56,7 @@ class TestASTAPI(TestCase):
             for b in Bar
             if f.id == b.age and f.age in [1, 2] or b.name == 'a'
         )
-        q2 = Foo.query.join(Bar).filter(
+        q2 = Foo.query.join(Bar).on(
             (Foo.id == Bar.age) & (Foo.age.in_((1, 2))) | (
                 Bar.name == 'a'
             )

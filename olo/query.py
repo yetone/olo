@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+import operator
 import re
 import sys
 import types
-import operator
 from enum import Enum
-from typing import TYPE_CHECKING, Optional, List, Union
+from typing import TYPE_CHECKING, Optional, List, Union, Iterable, Type, Tuple
 
-from olo.expression import UnaryExpression, BinaryExpression
-from olo.funcs import DISTINCT
+from olo.expression import UnaryExpression, BinaryExpression, Expression
+from olo.funcs import DISTINCT, Function
 
 if TYPE_CHECKING:
     from olo.database import OLOCursor
-    from olo.model import Model
+    from olo.model import Model, ModelMeta
 
 from itertools import chain
 from decorator import decorator
@@ -87,6 +87,48 @@ def _lambda_eval(func, self, *args, **kwargs):
     return func(self, *args, **kwargs)
 
 
+def _check_aggregation(exp: Expression) -> bool:
+    if isinstance(exp, BinaryExpression):
+        if isinstance(exp.left, Function):
+            return True
+        if isinstance(exp.right, Function):
+            return True
+        if isinstance(exp.left, Expression) and _check_aggregation(exp.left):
+                return True
+        if isinstance(exp.right, Expression) and _check_aggregation(exp.right):
+                return True
+    return False
+
+
+def _split_where_expression_and_having_expression(expression: BinaryExpression) -> Tuple[Optional[BinaryExpression],
+                                                                                         Optional[BinaryExpression]]:
+    stack = [expression]
+    and_expressions = []
+    while stack:
+        exp = stack.pop()
+        if exp is None:
+            continue
+        if exp.operator == 'AND':
+            stack.append(exp.right)
+            stack.append(exp.left)
+            continue
+        and_expressions.append(exp)
+    where_expressions = []
+    having_expressions = []
+    for exp in and_expressions:
+        if _check_aggregation(exp):
+            having_expressions.append(exp)
+        else:
+            where_expressions.append(exp)
+    where_expression = None
+    having_expression = None
+    if where_expressions:
+        where_expression = reduce(operator.and_, where_expressions)
+    if having_expressions:
+        having_expression = reduce(operator.and_, having_expressions)
+    return where_expression, having_expression
+
+
 class JoinType(Enum):
     INNER = 0
     LEFT = 1
@@ -126,17 +168,21 @@ class JoinChain(SQLASTInterface):
         return cloned
 
 
+if TYPE_CHECKING:
+    Entity = Union[Type[Model], Field, Function]
+
+
 class Query(SQLASTInterface):
 
-    def __init__(self, model_class: Model):
+    def __init__(self, model_class: Type[Model]):
         self._model_class = model_class
-        self._expressions = []
-        self._having_expressions = []
+        self._expression: Optional[BinaryExpression] = None
+        self._having_expression: Optional[BinaryExpression] = None
         self._offset = 0
         self._limit = None
         self._order_by: List[UnaryExpression] = []
         self._group_by = []
-        self._entities = [model_class]
+        self._entities: List[Entity] = [model_class]
         self._raw = False
         self._join_chain: Optional[JoinChain] = None
         self._for_update = False
@@ -147,27 +193,54 @@ class Query(SQLASTInterface):
         inst.__dict__.update(kwargs)
         return inst
 
-    def _transform_entities(self, entities):
+    def _get_entities(self, fields: Iterable[Union[Entity, str]]) -> List[Entity]:
+        from olo.model import ModelMeta
+
+        if not isinstance(fields, (list, tuple, set)):
+            fields = [fields]
+
         res = []
-        for item in entities:
-            if isinstance(item, str_types):
-                field = self._model_class._olo_get_field(item)
-                if field is None:
-                    raise ORMError(f'{friendly_repr(item)} is not a valid field in Model {self._model_class.__name__}')
-                item = field
-            res.append(item)
+        for field in fields:
+            if isinstance(field, str_types):
+                field_ = self._model_class._olo_get_field(field)
+                if field_ is None:
+                    raise ORMError(f'{friendly_repr(field)} is not a valid field in Model {self._model_class.__name__}')
+                field = field_
+            if not isinstance(field, (ModelMeta, Field, Function)):
+                raise ORMError(f'{field} is an not valid entity!')
+            res.append(field)
         return res
 
     @_lambda_eval
-    def map(self, *entities, **kwargs):
+    def map(self, *entities: Union[Entity, str], **kwargs):
+        from olo.model import ModelMeta
+
         self._raw = kwargs.get('raw', False)
-        entities = self._transform_entities(entities)
-        return self._update(_entities=list(
+        entities = self._get_entities(entities)
+
+        q = self._update(_entities=list(
             chain.from_iterable(
                 x if isinstance(x, (list, tuple, set)) else (x,)
                 for x in entities
             )
         ))
+
+        has_aggregation = False
+        first_field = None
+        for entity in q._entities:
+            if isinstance(entity, ModelMeta) and first_field is None:
+                first_field = self._model_class.get_singleness_pk_field()
+
+            if isinstance(entity, Field) and first_field is None:
+                first_field = entity
+
+            if isinstance(entity, Function):
+                has_aggregation = True
+
+        if has_aggregation and first_field is not None:
+            q = q.group_by(first_field)
+
+        return q
 
     def __call__(self, *entities, **kwargs):
         return self.map(*entities, **kwargs)
@@ -175,7 +248,7 @@ class Query(SQLASTInterface):
     @_lambda_eval
     def flat_map(self, query):
         return self.join(query._model_class).on(
-            *query._expressions
+            query._expression
         ).map(*query._entities)
 
     def __getitem__(self, item):
@@ -241,12 +314,35 @@ class Query(SQLASTInterface):
         expression_dict = self._model_class._wash_attrs(
             expression_dict
         )
-        expressions = self._expressions + list(expressions) + list(
+
+        expressions = list(expressions) + list(
             _dict_to_expressions(
                 self._model_class, expression_dict
             )
         )
-        return self._update(_expressions=expressions)
+
+        expression = self._expression
+
+        if expressions:
+            _expression = reduce(
+                operator.and_,
+                expressions,
+            )
+            if expression is not None:
+                expression &= _expression
+            else:
+                expression = _expression
+
+        expression, having_expression = _split_where_expression_and_having_expression(expression)
+
+        q = self
+        if expression is not None:
+            q = q._update(_expression=expression)
+
+        if having_expression is not None:
+            q = q.having(having_expression)
+
+        return q
 
     @_lambda_eval
     def on(self, *on_expressions, **on_expression_dict):
@@ -277,13 +373,19 @@ class Query(SQLASTInterface):
             having_expression_dict
         )
         having_expressions = (
-            self._having_expressions + list(having_expressions) + list(
+            list(having_expressions) + list(
                 _dict_to_expressions(
                     self._model_class, having_expression_dict
                 )
             )
         )
-        return self._update(_having_expressions=having_expressions)
+        q = self
+        if having_expressions:
+            having_expression = reduce(operator.and_, having_expressions)
+            if self._having_expression is not None:
+                having_expression = self._having_expression & having_expression
+            q = q._update(_having_expression=having_expression)
+        return q
 
     def for_update(self):
         return self._update(_for_update=True)
@@ -437,34 +539,47 @@ class Query(SQLASTInterface):
 
     def _get_primitive_sql_ast(self, base_sql_ast):
         sql_ast = list(base_sql_ast)  # copy ast
-        if self._expressions:
+        if self._expression is not None:
             sql_ast.append([
                 'WHERE',
-                ['AND'] + [e.get_sql_ast() for e in self._expressions]
+                self._expression.get_sql_ast()
             ])
+
+        if self._having_expression is not None and not self._group_by:
+            group_by = []
+            for entity in self._entities:
+                if entity is self._model_class:
+                    pk = self._model_class.get_singleness_pk_field()
+                    group_by.append(pk)
+                    break
+
+                if isinstance(entity, Field):
+                    group_by.append(entity)
+
+            self._group_by = group_by
 
         if self._group_by:
-            fields = self._get_fields(self._group_by)
+            entities = self._get_entities(self._group_by)
+            field_names = {getattr(f, 'name', '') for f in entities}
             pk = self._model_class.get_singleness_pk_field()
             # self._entities must casting to set or pk in self._entities will always be True!!!
-            if self._entities_contains(pk):
-                fields.append(pk)
+            if self._entities_contains(pk) and pk.name not in field_names:
+                entities.append(pk)
             sql_ast.append([
                 'GROUP BY',
-                ['SERIES'] + [f.get_sql_ast() for f in fields]
+                ['SERIES'] + [f.get_sql_ast() for f in entities]
             ])
 
-        if self._having_expressions:
+        if self._having_expression is not None:
             sql_ast.append([
                 'HAVING',
-                ['AND'] + [e.get_sql_ast() for e in self._having_expressions]
+                self._having_expression.get_sql_ast()
             ])
 
         if self._order_by:
-            fields = self._get_fields(self._order_by)
             sql_ast.append([
                 'ORDER BY',
-                ['SERIES'] + [f.get_sql_ast() for f in fields]
+                ['SERIES'] + [f.get_sql_ast() for f in self._order_by]
             ])
 
         if self._limit is not None:
@@ -482,12 +597,8 @@ class Query(SQLASTInterface):
 
     def _get_expression(self, is_having=False):
         if is_having:
-            expressions = self._having_expressions  # pragma: no cover
-        else:
-            expressions = self._expressions
-
-        if expressions:
-            return reduce(operator.and_, expressions)
+            return self._having_expression
+        return self._expression
 
     def _get_base_sql_ast(self, modifier=None, entities=None):
         entities = self._entities if entities is None else entities
@@ -590,20 +701,3 @@ class Query(SQLASTInterface):
 
         for entity in session.entities:
             yield entity
-
-    def _get_fields(self, fields):
-        if not isinstance(fields, (list, tuple)):
-            fields = [fields]  # pragma: no cover
-
-        res = []
-
-        for field in fields:
-            if isinstance(field, str_types):
-                _field = getattr(self._model_class, field, None)
-                if not _field:
-                    raise ExpressionError('Cannot find field: `{}`'.format(  # noqa pragma: no cover pylint: disable=W
-                        field
-                    ))
-                field = _field
-            res.append(field)
-        return res
