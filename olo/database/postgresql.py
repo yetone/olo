@@ -1,13 +1,15 @@
 import logging
 import re
-from typing import Tuple, Optional
+from enum import Enum
+from typing import Tuple, Optional, List
 
 from olo.logger import logger
 from olo.database import BaseDataBase, OLOCursor
 from olo.database.mysql import MySQLConnProxy
 from olo.libs.pool import Pool
 from olo.sql_ast_translators.postgresql_sql_ast_translator import PostgresSQLSQLASTTranslator
-
+from olo.sql_ast_translators.sql_ast_translator import AST
+from olo.utils import camel2underscore
 
 PATTERN_INDEX_DEF = re.compile('CREATE (?P<unique>UNIQUE )?INDEX (?P<name>.*) ON .* (?P<btree>USING btree )?\\((?P<fields>.*?)\\)')  # noqa
 
@@ -128,3 +130,50 @@ class PostgreSQLDataBase(BaseDataBase):
             except Exception:  # pragma: no cover
                 return []  # pragma: no cover
         return self._index_rows_mapping[table_name]
+
+    def to_db_types_sql_asts(self) -> List[AST]:
+        asts = []
+
+        existing_enums = {}
+        with self.transaction():
+            rv = self.execute(
+                'select t.typname, e.enumlabel from pg_type as t join pg_enum as e on t.oid = e.enumtypid'
+            )
+            for name, label in rv:
+                existing_enums.setdefault(name, []).append(label)
+
+        seen = set()
+
+        for model in self._models:
+            for k in model.__sorted_fields__:
+                f = getattr(model, k)
+
+                if isinstance(f.type, type) and issubclass(f.type, Enum):
+                    enum_name = camel2underscore(f.type.__name__)
+
+                    if enum_name in seen:
+                        continue
+
+                    seen.add(enum_name)
+
+                    enum_labels = existing_enums.get(enum_name)
+
+                    if enum_labels is None:
+                        enum_labels = list(f.type.__members__)
+                        asts.append([
+                            'CREATE_ENUM',
+                            enum_name,
+                            enum_labels,
+                        ])
+                        continue
+
+                    for member_name in f.type.__members__:
+                        if member_name not in enum_labels:
+                            asts.append([
+                                'ADD_ENUM_LABEL',
+                                enum_name,
+                                enum_labels[-1] if enum_labels else '',
+                                member_name
+                            ])
+                            enum_labels.append(member_name)
+        return asts
