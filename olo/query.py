@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import operator
 import re
 import sys
 import types
-import operator
-from typing import TYPE_CHECKING, Optional, List
+from enum import Enum
+from typing import TYPE_CHECKING, Optional, List, Union, Iterable, Type, Tuple
 
-from olo.expression import UnaryExpression
-from olo.funcs import DISTINCT
+from olo.expression import UnaryExpression, BinaryExpression, Expression
+from olo.funcs import DISTINCT, Function
 
 if TYPE_CHECKING:
     from olo.database import OLOCursor
-    from olo.model import Model
+    from olo.model import Model, ModelMeta
 
 from itertools import chain
 from decorator import decorator
@@ -19,11 +20,10 @@ from decorator import decorator
 from olo.compat import izip, imap, str_types, iteritems, reduce
 from olo.interfaces import SQLASTInterface
 from olo.field import Field
-from olo.errors import ExpressionError, OrderByError, SupportError
-from olo.context import table_alias_mapping_context
+from olo.errors import ExpressionError, OrderByError, SupportError, ORMError
 from olo.libs.compiler.translators.func_translator import transform_func
 from olo.session import QuerySession
-from olo.utils import optimize_sql_ast
+from olo.utils import optimize_sql_ast, friendly_repr
 
 
 PATTERN_NEG = re.compile(r'^\-')
@@ -87,42 +87,104 @@ def _lambda_eval(func, self, *args, **kwargs):
     return func(self, *args, **kwargs)
 
 
-def _detect_table_alias(table_section, rev_alias_mapping=None):
-    rev_alias_mapping = {} if rev_alias_mapping is None else rev_alias_mapping
+def _check_aggregation(exp: Expression) -> bool:
+    if isinstance(exp, BinaryExpression):
+        if isinstance(exp.left, Function):
+            return True
+        if isinstance(exp.right, Function):
+            return True
+        if isinstance(exp.left, Expression) and _check_aggregation(exp.left):
+                return True
+        if isinstance(exp.right, Expression) and _check_aggregation(exp.right):
+                return True
+    return False
 
-    if table_section[0] == 'TABLE':
-        alias = table_section[1][0].lower()
-        orig_alias = alias
-        n = 0
-        while alias in rev_alias_mapping:
-            n += 1
-            alias = orig_alias + str(n)
-        rev_alias_mapping[alias] = table_section[1]
-        return ['ALIAS', table_section, alias]
 
-    if isinstance(table_section, list):
-        return [_detect_table_alias(x, rev_alias_mapping=rev_alias_mapping)
-                for x in table_section]
+def _split_where_expression_and_having_expression(expression: BinaryExpression) -> Tuple[Optional[BinaryExpression],
+                                                                                         Optional[BinaryExpression]]:
+    stack = [expression]
+    and_expressions = []
+    while stack:
+        exp = stack.pop()
+        if exp is None:
+            continue
+        if exp.operator == 'AND':
+            stack.append(exp.right)
+            stack.append(exp.left)
+            continue
+        and_expressions.append(exp)
+    where_expressions = []
+    having_expressions = []
+    for exp in and_expressions:
+        if _check_aggregation(exp):
+            having_expressions.append(exp)
+        else:
+            where_expressions.append(exp)
+    where_expression = None
+    having_expression = None
+    if where_expressions:
+        where_expression = reduce(operator.and_, where_expressions)
+    if having_expressions:
+        having_expression = reduce(operator.and_, having_expressions)
+    return where_expression, having_expression
 
-    return table_section
+
+class JoinType(Enum):
+    INNER = 0
+    LEFT = 1
+    RIGHT = 2
+    FULL = 3
+
+
+class JoinChain(SQLASTInterface):
+    on_: Optional[BinaryExpression]
+
+    def __init__(self, type_: JoinType, left: Union[Model, JoinChain], right: Model) -> None:
+        self.type = type_
+        self.left = left
+        self.right = right
+        self.on_ = None
+
+    def on(self, on: BinaryExpression) -> None:
+        if self.on_ is None:
+            self.on_ = on
+            return
+        self.on_ = self.on_ & on
+
+    def get_sql_ast(self) -> List:
+        from olo.model import Model
+        if isinstance(self.left, type) and issubclass(self.left, Model):
+            left_ast = ['TABLE', self.left._get_table_name()]
+        else:
+            left_ast = self.left.get_sql_ast()
+        on_ast = []
+        if self.on_:
+            on_ast = self.on_.get_sql_ast()
+        return ['JOIN', self.type.name, left_ast, ['TABLE', self.right._get_table_name()], on_ast]
+
+    def clone(self) -> JoinChain:
+        cloned = JoinChain(self.type, self.left, self.right)
+        cloned.on(self.on_)
+        return cloned
+
+
+if TYPE_CHECKING:
+    Entity = Union[Type[Model], Field, Function]
 
 
 class Query(SQLASTInterface):
 
-    def __init__(self, model_class: Model):
+    def __init__(self, model_class: Type[Model]):
         self._model_class = model_class
-        self._expressions = []
-        self._having_expressions = []
-        self._on_expressions = []
+        self._expression: Optional[BinaryExpression] = None
+        self._having_expression: Optional[BinaryExpression] = None
         self._offset = 0
         self._limit = None
         self._order_by: List[UnaryExpression] = []
         self._group_by = []
-        self._entities = [model_class]
+        self._entities: List[Entity] = [model_class]
         self._raw = False
-        self._join = None
-        self._left_join = None
-        self._right_join = None
+        self._join_chain: Optional[JoinChain] = None
         self._for_update = False
 
     def _update(self, **kwargs):
@@ -131,34 +193,62 @@ class Query(SQLASTInterface):
         inst.__dict__.update(kwargs)
         return inst
 
-    def _transform_entities(self, entities):
+    def _get_entities(self, fields: Iterable[Union[Entity, str]]) -> List[Entity]:
+        from olo.model import ModelMeta
+
+        if not isinstance(fields, (list, tuple, set)):
+            fields = [fields]
+
         res = []
-        for item in entities:
-            if isinstance(item, str_types):
-                field = self._model_class._olo_get_field(item)
-                if field is not None:
-                    item = field
-            res.append(item)
+        for field in fields:
+            if isinstance(field, str_types):
+                field_ = self._model_class._olo_get_field(field)
+                if field_ is None:
+                    raise ORMError(f'{friendly_repr(field)} is not a valid field in Model {self._model_class.__name__}')
+                field = field_
+            if not isinstance(field, (ModelMeta, Field, Function)):
+                raise ORMError(f'{field} is an not valid entity!')
+            res.append(field)
         return res
 
     @_lambda_eval
-    def map(self, *entities, **kwargs):
+    def map(self, *entities: Union[Entity, str], **kwargs):
+        from olo.model import ModelMeta
+
         self._raw = kwargs.get('raw', False)
-        entities = self._transform_entities(entities)
-        return self._update(_entities=list(
+        entities = self._get_entities(entities)
+
+        q = self._update(_entities=list(
             chain.from_iterable(
                 x if isinstance(x, (list, tuple, set)) else (x,)
                 for x in entities
             )
         ))
 
+        has_aggregation = False
+        first_field = None
+        for entity in q._entities:
+            if isinstance(entity, ModelMeta) and first_field is None:
+                first_field = self._model_class.get_singleness_pk_field()
+
+            if isinstance(entity, Field) and first_field is None:
+                first_field = entity
+
+            if isinstance(entity, Function):
+                has_aggregation = True
+
+        if has_aggregation and first_field is not None:
+            q = q.group_by(first_field)
+
+        return q
+
     def __call__(self, *entities, **kwargs):
         return self.map(*entities, **kwargs)
 
     @_lambda_eval
     def flat_map(self, query):
-        return self.join(query._model_class).filter(
-            *query._expressions
+        return self.join(query._model_class).on(
+            query._expression
         ).map(*query._entities)
 
     def __getitem__(self, item):
@@ -192,15 +282,31 @@ class Query(SQLASTInterface):
 
     @_lambda_eval
     def join(self, model_class):
-        return self._update(_join=model_class)
+        left = self._model_class
+        if self._join_chain is not None:
+            left = self._join_chain
+        return self._update(_join_chain=JoinChain(JoinType.INNER, left, model_class))
 
     @_lambda_eval
     def left_join(self, model_class):
-        return self._update(_left_join=model_class)
+        left = self._model_class
+        if self._join_chain is not None:
+            left = self._join_chain
+        return self._update(_join_chain=JoinChain(JoinType.LEFT, left, model_class))
 
     @_lambda_eval
     def right_join(self, model_class):
-        return self._update(_right_join=model_class)
+        left = self._model_class
+        if self._join_chain is not None:
+            left = self._join_chain
+        return self._update(_join_chain=JoinChain(JoinType.RIGHT, left, model_class))
+
+    @_lambda_eval
+    def full_join(self, model_class):
+        left = self._model_class
+        if self._join_chain is not None:
+            left = self._join_chain
+        return self._update(_join_chain=JoinChain(JoinType.FULL, left, model_class))
 
     @_lambda_eval
     def filter(self, *expressions, **expression_dict):
@@ -208,25 +314,57 @@ class Query(SQLASTInterface):
         expression_dict = self._model_class._wash_attrs(
             expression_dict
         )
-        expressions = self._expressions + list(expressions) + list(
+
+        expressions = list(expressions) + list(
             _dict_to_expressions(
                 self._model_class, expression_dict
             )
         )
-        return self._update(_expressions=expressions)
+
+        expression = self._expression
+
+        if expressions:
+            _expression = reduce(
+                operator.and_,
+                expressions,
+            )
+            if expression is not None:
+                expression &= _expression
+            else:
+                expression = _expression
+
+        expression, having_expression = _split_where_expression_and_having_expression(expression)
+
+        q = self
+        if expression is not None:
+            q = q._update(_expression=expression)
+
+        if having_expression is not None:
+            q = q.having(having_expression)
+
+        return q
 
     @_lambda_eval
     def on(self, *on_expressions, **on_expression_dict):
+        if self._join_chain is None:
+            raise ORMError('this query does not have a join chain!')
+
         self._model_class._check_attrs(on_expression_dict)
         on_expression_dict = self._model_class._wash_attrs(
             on_expression_dict
         )
-        on_expressions = self._on_expressions + list(on_expressions) + list(
+        on_expressions = list(on_expressions) + list(
             _dict_to_expressions(
                 self._model_class, on_expression_dict
             )
         )
-        return self._update(_on_expressions=on_expressions)
+        on_expression = reduce(
+            operator.and_,
+            on_expressions
+        )
+        join_chain = self._join_chain.clone()
+        join_chain.on(on_expression)
+        return self._update(_join_chain=join_chain)
 
     @_lambda_eval
     def having(self, *having_expressions, **having_expression_dict):
@@ -235,13 +373,19 @@ class Query(SQLASTInterface):
             having_expression_dict
         )
         having_expressions = (
-            self._having_expressions + list(having_expressions) + list(
+            list(having_expressions) + list(
                 _dict_to_expressions(
                     self._model_class, having_expression_dict
                 )
             )
         )
-        return self._update(_having_expressions=having_expressions)
+        q = self
+        if having_expressions:
+            having_expression = reduce(operator.and_, having_expressions)
+            if self._having_expression is not None:
+                having_expression = self._having_expression & having_expression
+            q = q._update(_having_expression=having_expression)
+        return q
 
     def for_update(self):
         return self._update(_for_update=True)
@@ -279,13 +423,12 @@ class Query(SQLASTInterface):
         return COUNT(self).first()  # pylint: disable=E1101
 
     def count_and_all(self):
-        base_sql_ast, alias_mapping = self._get_base_sql_ast(
+        base_sql_ast = self._get_base_sql_ast(
             modifier='SQL_CALC_FOUND_ROWS'
         )
         with self.db.transaction():
             cursor = self.db.get_cursor()
             rv = self._get_rv(base_sql_ast=base_sql_ast,
-                              alias_mapping=alias_mapping,
                               cursor=cursor)
             cursor.ast_execute(['SELECT', ['CALL', 'FOUND_ROWS']])
             count = cursor.fetchone()[0]
@@ -301,6 +444,7 @@ class Query(SQLASTInterface):
         if not expression:
             raise ExpressionError('Cannot execute update because of '
                                   'without expression')
+
         assignments, _, _ = self._model_class._split_attrs(values)
 
         update_sql_ast = [
@@ -316,10 +460,9 @@ class Query(SQLASTInterface):
         if isinstance(db, PostgreSQLDataBase):
             pk = self._model_class.get_singleness_pk_field()
             if self._order_by:
-                base_sql_ast, alias_mapping = self.map(pk).for_update()._get_base_sql_ast()
+                base_sql_ast = self.map(pk).for_update()._get_base_sql_ast()
                 sql_ast = self.get_sql_ast(
                     base_sql_ast=base_sql_ast,
-                    alias_mapping=alias_mapping,
                 )
                 update_sql_ast.append(
                     ['WHERE', ['BINARY_OPERATE', 'IN', ['QUOTE', pk.name], ['BRACKET', sql_ast]]]
@@ -352,20 +495,16 @@ class Query(SQLASTInterface):
         return self._model_class._get_table_name()
 
     def _get_rv(self, base_sql_ast=None,
-                alias_mapping=None,
                 cursor=None):
         return self.__get_rv(
             base_sql_ast=base_sql_ast,
-            alias_mapping=alias_mapping,
             cursor=cursor,
         )
 
     def __get_rv(self, base_sql_ast=None,
-                 alias_mapping=None,
                  cursor=None):
         sql_ast = self.get_sql_ast(
             base_sql_ast=base_sql_ast,
-            alias_mapping=alias_mapping,
         )
         return self._get_rv_by_sql_ast(sql_ast, cursor=cursor)
 
@@ -377,17 +516,15 @@ class Query(SQLASTInterface):
         with self.db.transaction():
             return self.db.ast_execute(sql_ast)
 
-    def get_sql_ast(self, base_sql_ast=None, alias_mapping=None):
+    def get_sql_ast(self, base_sql_ast=None):
         sql_ast = self.get_primitive_sql_ast(
-            base_sql_ast=base_sql_ast, alias_mapping=alias_mapping)
+            base_sql_ast=base_sql_ast)
         return optimize_sql_ast(sql_ast)
 
-    def get_primitive_sql_ast(self, base_sql_ast=None, alias_mapping=None):
+    def get_primitive_sql_ast(self, base_sql_ast=None):
         if base_sql_ast is None:
-            base_sql_ast, alias_mapping = self._get_base_sql_ast()
-        alias_mapping = alias_mapping or {}
-        with table_alias_mapping_context(alias_mapping):
-            return self._get_primitive_sql_ast(base_sql_ast)
+            base_sql_ast = self._get_base_sql_ast()
+        return self._get_primitive_sql_ast(base_sql_ast)
 
     def _entities_contains(self, field):
         if len(self._entities) == 1 and self._entities[0] is self._model_class:
@@ -402,39 +539,47 @@ class Query(SQLASTInterface):
 
     def _get_primitive_sql_ast(self, base_sql_ast):
         sql_ast = list(base_sql_ast)  # copy ast
-        if self._on_expressions:
-            sql_ast.append([
-                'ON',
-                ['AND'] + [e.get_sql_ast() for e in self._on_expressions]
-            ])
-        if self._expressions:
+        if self._expression is not None:
             sql_ast.append([
                 'WHERE',
-                ['AND'] + [e.get_sql_ast() for e in self._expressions]
+                self._expression.get_sql_ast()
             ])
+
+        if self._having_expression is not None and not self._group_by:
+            group_by = []
+            for entity in self._entities:
+                if entity is self._model_class:
+                    pk = self._model_class.get_singleness_pk_field()
+                    group_by.append(pk)
+                    break
+
+                if isinstance(entity, Field):
+                    group_by.append(entity)
+
+            self._group_by = group_by
 
         if self._group_by:
-            fields = self._get_fields(self._group_by)
+            entities = self._get_entities(self._group_by)
+            field_names = {getattr(f, 'name', '') for f in entities}
             pk = self._model_class.get_singleness_pk_field()
             # self._entities must casting to set or pk in self._entities will always be True!!!
-            if self._entities_contains(pk):
-                fields.append(pk)
+            if self._entities_contains(pk) and pk.name not in field_names:
+                entities.append(pk)
             sql_ast.append([
                 'GROUP BY',
-                ['SERIES'] + [f.get_sql_ast() for f in fields]
+                ['SERIES'] + [f.get_sql_ast() for f in entities]
             ])
 
-        if self._having_expressions:
+        if self._having_expression is not None:
             sql_ast.append([
                 'HAVING',
-                ['AND'] + [e.get_sql_ast() for e in self._having_expressions]
+                self._having_expression.get_sql_ast()
             ])
 
         if self._order_by:
-            fields = self._get_fields(self._order_by)
             sql_ast.append([
                 'ORDER BY',
-                ['SERIES'] + [f.get_sql_ast() for f in fields]
+                ['SERIES'] + [f.get_sql_ast() for f in self._order_by]
             ])
 
         if self._limit is not None:
@@ -450,38 +595,16 @@ class Query(SQLASTInterface):
 
         return sql_ast
 
-    def _get_expression(self, is_having=False, is_on=False):
+    def _get_expression(self, is_having=False):
         if is_having:
-            expressions = self._having_expressions  # pragma: no cover
-        elif is_on:
-            expressions = self._on_expressions  # pragma: no cover
-        else:
-            expressions = self._expressions
-
-        if expressions:
-            return reduce(operator.and_, expressions)
+            return self._having_expression
+        return self._expression
 
     def _get_base_sql_ast(self, modifier=None, entities=None):
         entities = self._entities if entities is None else entities
 
-        if self._join:
-            table_section = [
-                'JOIN',
-                ['TABLE', self.table_name],
-                ['TABLE', self._join._get_table_name()]
-            ]
-        elif self._left_join:
-            table_section = [
-                'LEFT JOIN',
-                ['TABLE', self.table_name],
-                ['TABLE', self._left_join._get_table_name()]
-            ]
-        elif self._right_join:
-            table_section = [
-                'RIGHT JOIN',
-                ['TABLE', self.table_name],
-                ['TABLE', self._right_join._get_table_name()]
-            ]
+        if self._join_chain:
+            table_section = self._join_chain.get_sql_ast()
         else:
             table_section = ['TABLE', self.table_name]
 
@@ -497,26 +620,17 @@ class Query(SQLASTInterface):
                 if not self._entities_contains(ob.value):
                     entities = entities + [ob.value]
 
-        rev_alias_mapping = {}
-        table_section = _detect_table_alias(
-            table_section,
-            rev_alias_mapping=rev_alias_mapping
-        )
-
-        alias_mapping = {v: k for k, v in sorted(iteritems(rev_alias_mapping))}
-
-        with table_alias_mapping_context(alias_mapping):
-            select_ast = [
-                'SERIES',
-            ] + [e.get_sql_ast() if hasattr(e, 'get_sql_ast') else e
-                 for e in entities]
-            if len(select_ast) == 2 and select_ast[1][0] == 'SERIES':
-                select_ast = select_ast[1]
-            if modifier is not None:
-                select_ast = ['MODIFIER', modifier, select_ast]
+        select_ast = [
+            'SERIES',
+        ] + [e.get_sql_ast() if hasattr(e, 'get_sql_ast') else e
+             for e in entities]
+        if len(select_ast) == 2 and select_ast[1][0] == 'SERIES':
+            select_ast = select_ast[1]
+        if modifier is not None:
+            select_ast = ['MODIFIER', modifier, select_ast]
 
         sql_ast = ['SELECT', select_ast, ['FROM', table_section]]
-        return sql_ast, alias_mapping
+        return sql_ast
 
     # pylint: disable=E0602
     def _iter_wrap_rv(self, rv):
@@ -587,20 +701,3 @@ class Query(SQLASTInterface):
 
         for entity in session.entities:
             yield entity
-
-    def _get_fields(self, fields):
-        if not isinstance(fields, (list, tuple)):
-            fields = [fields]  # pragma: no cover
-
-        res = []
-
-        for field in fields:
-            if isinstance(field, str_types):
-                _field = getattr(self._model_class, field, None)
-                if not _field:
-                    raise ExpressionError('Cannot find field: `{}`'.format(  # noqa pragma: no cover pylint: disable=W
-                        field
-                    ))
-                field = _field
-            res.append(field)
-        return res

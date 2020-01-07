@@ -1,5 +1,8 @@
+from olo.errors import ORMError
+from olo.expression import BinaryExpression
 from olo.interfaces import SQLASTInterface
 from olo.query import Query
+from olo.field import Field
 
 
 def _order_by_to_str(item):
@@ -27,11 +30,9 @@ def order_by_to_strs(order_by):
 class CachedQuery(Query):
 
     def _can_be_cached(self):  # pylint: disable=too-many-return-statements
-        if self._having_expressions:
+        if self._having_expression is not None:
             return False
-        if self._on_expressions:
-            return False
-        if self._join:
+        if self._join_chain:
             return False
         if (
                 len(self._entities) != 1 or
@@ -40,18 +41,34 @@ class CachedQuery(Query):
             return False
         if self._group_by:
             return False  # pragma: no cover
-        for exp in self._expressions:
-            if not hasattr(exp, 'left'):
+        exps = [self._expression]
+        while exps:
+            exp = exps.pop()
+            if exp is None:
+                continue
+
+            if not isinstance(exp, BinaryExpression):
                 return False  # pragma: no cover
-            if not hasattr(exp.left, 'attr_name'):
-                return False  # pragma: no cover
-            if exp.operator not in (
-                    '=', 'is'
-            ):
-                return False
-            if hasattr(exp, 'right'):
+
+            if isinstance(exp.left, BinaryExpression):
+                if exp.operator != 'AND':
+                    return False
+                if not isinstance(exp.right, BinaryExpression):
+                    return False
+                exps.append(exp.left)
+                exps.append(exp.right)
+                continue
+
+            if isinstance(exp.left, Field):
+                if exp.operator not in (
+                        '=', 'is'
+                ):
+                    return False
                 if isinstance(exp.right, SQLASTInterface):
                     return False
+                continue
+
+            return False
         return True
 
     def first(self):
@@ -61,10 +78,24 @@ class CachedQuery(Query):
     one = first
 
     def _get_expression_dict(self):
-        return {
-            exp.left.attr_name: exp.right
-            for exp in self._expressions
-        }
+        res = {}
+        exps = [self._expression]
+        while exps:
+            exp = exps.pop()
+            if exp is None:
+                continue
+
+            if isinstance(exp.left, BinaryExpression):
+                exps.append(exp.left)
+                exps.append(exp.right)
+                continue
+
+            if isinstance(exp.left, Field):
+                res[exp.left.attr_name] = exp.right
+                continue
+
+            raise ORMError('cannot access here!!!')
+        return res
 
     def all(self):
         fallback = lambda: super(CachedQuery, self).all()  # noqa

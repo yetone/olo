@@ -7,6 +7,8 @@ from functools import wraps
 from queue import Queue, Empty
 from typing import TYPE_CHECKING, Optional, Tuple, Set, List
 
+from olo.sql_ast_translators.sql_ast_translator import AST
+
 if TYPE_CHECKING:
     from olo.model import Model
 
@@ -139,7 +141,7 @@ class BaseDataBase(object):
         self._tables = None
         self._index_rows_mapping = {}
         self.enable_log = False
-        self._models = []
+        self._models: List[Model] = []
         self.modified_cursors = ThreadedObject(Queue)
 
     def add_lazy_func(self, func):
@@ -214,38 +216,40 @@ class BaseDataBase(object):
                 return []  # pragma: no cover
         return self._index_rows_mapping[table_name]
 
-    def gen_tables_schema(self):
-        asts = [
-                   self.to_model_table_schema_sql_ast(m)
-                   for m in self._models
-               ] + sum(
-            (self.to_model_indexes_sql_asts(m) for m in self._models),
-            []
-        )
-        return self.ast_translator.translate(['PROGN'] + asts)[0]
+    def gen_tables_schemas(self):
+        asts = self.to_db_types_sql_asts() + self.to_db_table_schema_sql_asts() + self.to_db_indexes_sql_asts()
+        for ast in asts:
+            yield self.ast_translator.translate(ast)
+        # return self.ast_translator.translate(['PROGN'] + asts)[0]
 
-    @classmethod
-    def to_model_indexes_sql_asts(cls, model: Model):
+    def to_db_indexes_sql_asts(self) -> List[AST]:
         asts = []
 
-        for key in reduce_indexes(model.__index_keys__):
-            key_name = 'idx_' + '_'.join(map(to_camel_case, key))
-            names = []
-            for p in key:
-                f = getattr(model, p)
-                if not isinstance(f, BaseField):
-                    break  # pragma: no cover
-                names.append(f.name)
-            else:
-                if not names:
-                    continue
-                asts.append([
-                    'CREATE_INDEX', True, key_name, model._get_table_name(), names
-                ])
+        for model in self._models:
+            for key in reduce_indexes(model.__index_keys__):
+                key_name = 'idx_' + '_'.join(map(to_camel_case, key))
+                names = []
+                for p in key:
+                    f = getattr(model, p)
+                    if not isinstance(f, BaseField):
+                        break  # pragma: no cover
+                    names.append(f.name)
+                else:
+                    if not names:
+                        continue
+                    asts.append([
+                        'CREATE_INDEX', True, key_name, model._get_table_name(), names
+                    ])
         return asts
 
+    def to_db_types_sql_asts(self) -> List[AST]:
+        return []
+
+    def to_db_table_schema_sql_asts(self) -> List[AST]:
+        return [self._to_db_table_schema_sql_ast(m) for m in self._models]
+
     @classmethod
-    def to_model_table_schema_sql_ast(cls, model: Model):
+    def _to_db_table_schema_sql_ast(cls, model: Model) -> AST:
         # pylint: disable=too-many-statements
 
         ast = ['CREATE_TABLE', False, True, model._get_table_name()]
@@ -297,10 +301,9 @@ class BaseDataBase(object):
         return ast
 
     def create_all(self):
-        schema = self.gen_tables_schema()
         with self.transaction():
-            for sql in get_sqls(schema.split('\n')):
-                self.sql_execute(sql)
+            for sql, params in self.gen_tables_schemas():
+                self.sql_execute(sql, params)
 
     def register_model(self, model_cls):
         self._models.append(model_cls)
@@ -534,8 +537,8 @@ class DataBase(BaseDataBase):
             return cur  # pragma: no cover
         return MySQLCursor(cur, self)  # pragma: no cover
 
-    def gen_tables_schema(self):
-        raise NotImplementedError('not implement gen_tables_schema!')
+    def gen_tables_schemas(self):
+        raise NotImplementedError('not implement gen_tables_schemas!')
 
     def sql_execute(self, sql, params=None, **kwargs):
         self.log(sql, params)

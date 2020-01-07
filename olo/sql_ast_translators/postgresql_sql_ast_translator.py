@@ -3,6 +3,7 @@ from enum import Enum
 
 from olo.compat import Decimal, long, unicode
 from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator
+from olo.utils import camel2underscore
 
 
 class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
@@ -40,7 +41,7 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
         elif type_ is datetime:
             f_type = 'TIMESTAMP'
         elif isinstance(type_, type) and issubclass(type_, Enum):
-            f_type = 'VARCHAR(128)'
+            f_type = camel2underscore(type_.__name__)
         else:
             f_type = 'TEXT'
 
@@ -100,3 +101,12 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
             'LIMIT {} OFFSET {}'.format(offset_sql_piece, limit_sql_piece),
             limit_params + offset_params
         )
+
+    def post_CREATE_ENUM(self, name, labels):
+        placeholders = ', '.join(['%s'] * len(labels))
+        return f'CREATE TYPE {name} AS ENUM ({placeholders})', labels
+
+    def post_ADD_ENUM_LABEL(self, name, pre_label, label):
+        if not pre_label:
+            return f'ALTER TYPE {name} ADD VALUE %s', [label]
+        return f'ALTER TYPE {name} ADD VALUE %s AFTER %s', [label, pre_label]

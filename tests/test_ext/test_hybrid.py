@@ -45,23 +45,22 @@ class TestHybrid(TestCase):
             sql_ast,
             ['SELECT',
              ['SERIES',
-              ['COLUMN', 'f', 'id'],
-              ['COLUMN', 'f', 'name'],
-              ['COLUMN', 'f', 'age'],
-              ['COLUMN', 'f', 'age_str'],
-              ['COLUMN', 'f', 'key']
+              ['COLUMN', 'foo', 'id'],
+              ['COLUMN', 'foo', 'name'],
+              ['COLUMN', 'foo', 'age'],
+              ['COLUMN', 'foo', 'age_str'],
+              ['COLUMN', 'foo', 'key']
               ],
              ['FROM',
-              ['ALIAS',
-               ['TABLE', 'foo'],
-               'f']],
+              ['TABLE', 'foo'],
+              ],
              ['WHERE',
               ['BINARY_OPERATE',
                '>',
                ['BINARY_OPERATE',
                 '-',
-                ['COLUMN', 'f', 'age'],
-                ['COLUMN', 'f', 'id']],
+                ['COLUMN', 'foo', 'age'],
+                ['COLUMN', 'foo', 'id']],
                ['VALUE', 2]]]]
         )
         Foo.create(age=3)

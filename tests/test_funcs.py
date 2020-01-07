@@ -14,11 +14,11 @@ class TestFuncs(TestCase):
         )
         self.assertEqual(
             funcs.COUNT(1).get_sql_ast(),
-            ['CALL', 'COUNT', 1]
+            ['CALL', 'COUNT', ['VALUE', 1]]
         )
         self.assertEqual(
             funcs.COUNT(Dummy).get_sql_ast(),
-            ['CALL', 'COUNT', 1]
+            ['CALL', 'COUNT', ['VALUE', 1]]
         )
         self.assertEqual(
             funcs.COUNT(Dummy.id > 2).get_sql_ast(),
@@ -36,21 +36,21 @@ class TestFuncs(TestCase):
             funcs.COUNT(Dummy.query).get_sql_ast(),
             ['SELECT',
              ['SERIES',
-              ['CALL', 'COUNT', 1]],
+              ['CALL', 'COUNT', ['VALUE', 1]]],
              ['FROM',
-              ['ALIAS', ['TABLE', 'dummy'], 'd']]]
+              ['TABLE', 'dummy']]]
         )
         self.assertEqual(
             funcs.COUNT(Dummy.query.filter(id=1)).get_sql_ast(),
             ['SELECT',
              ['SERIES',
-              ['CALL', 'COUNT', 1]],
+              ['CALL', 'COUNT', ['VALUE', 1]]],
              ['FROM',
-              ['ALIAS', ['TABLE', 'dummy'], 'd']],
+              ['TABLE', 'dummy']],
              ['WHERE',
               ['BINARY_OPERATE',
                '=',
-               ['COLUMN', 'd', 'id'],
+               ['COLUMN', 'dummy', 'id'],
                ['VALUE', 1]]]]
         )
         c = funcs.COUNT(1).alias('c')
@@ -60,7 +60,7 @@ class TestFuncs(TestCase):
             ['BINARY_OPERATE',
              '>',
              ['ALIAS',
-              ['CALL', 'COUNT', 1],
+              ['CALL', 'COUNT', ['VALUE', 1]],
               'c'],
              ['VALUE', 1]]
         )
@@ -71,7 +71,7 @@ class TestFuncs(TestCase):
              '=',
              ['COLUMN', 'dummy', 'id'],
              ['ALIAS',
-              ['CALL', 'COUNT', 1],
+              ['CALL', 'COUNT', ['VALUE', 1]],
               'c']]
         )
         c = funcs.COUNT(1)
@@ -80,7 +80,7 @@ class TestFuncs(TestCase):
             exp.get_sql_ast(),
             ['BINARY_OPERATE',
              '>',
-             ['CALL', 'COUNT', 1],
+             ['CALL', 'COUNT', ['VALUE', 1]],
              ['VALUE', 1]]
         )
         exp = Dummy.id == c
@@ -89,7 +89,7 @@ class TestFuncs(TestCase):
             ['BINARY_OPERATE',
              '=',
              ['COLUMN', 'dummy', 'id'],
-             ['CALL', 'COUNT', 1]]
+             ['CALL', 'COUNT', ['VALUE', 1]]]
         )
 
     def test_sum(self):
@@ -151,18 +151,17 @@ class TestFuncs(TestCase):
         self.assertRaises(SupportError, lambda: funcs.MAX(Dummy))
         self.assertRaises(SupportError, lambda: funcs.MAX(Dummy.query))
         self.assertRaises(SupportError, lambda: funcs.MAX(Dummy.cq))
-        self.assertRaises(SupportError, lambda: funcs.MAX(Bar.query('id')))
+        # self.assertRaises(SupportError, lambda: funcs.MAX(Dummy.query('id')))
         self.assertEqual(
             funcs.MAX(Dummy.query('id')).get_sql_ast(),
             ['SELECT',
              ['SERIES',
               ['CALL',
                'MAX',
-               ['COLUMN', 'd', 'id']]],
+               ['COLUMN', 'dummy', 'id']]],
              ['FROM',
-              ['ALIAS',
-               ['TABLE', 'dummy'],
-               'd']]]
+              ['TABLE', 'dummy'],
+              ]]
         )
 
     def test_min(self):

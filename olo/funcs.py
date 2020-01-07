@@ -116,13 +116,18 @@ class COUNT(Function):
             if isinstance(
                     self.args[0], ModelMeta
             ):
-                return ['CALL', 'COUNT', 1]
+                return ['CALL', 'COUNT', ['VALUE', 1]]
             if isinstance(
                     self.args[0], BinaryExpression
             ):
                 ifexp = IF(self.args[0]).THEN(1).ELSE(None)
                 sql_ast = ifexp.get_sql_ast()
                 return ['CALL', 'COUNT', sql_ast]
+            if isinstance(
+                self.args[0], SQLASTInterface
+            ):
+                return ['CALL', 'COUNT', self.args[0].get_sql_ast()]
+            return ['CALL', 'COUNT', ['VALUE', self.args[0]]]
         return super(COUNT, self)._get_sql_ast()
 
 

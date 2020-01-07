@@ -1,9 +1,17 @@
 from contextlib import contextmanager
+from typing import Optional, Dict
+
 from .local import Local
 
 
 class Context(object):
     _local = None
+
+    alias_only: Optional[bool]
+    in_model_instantiate: Optional[bool]
+    instantiate_depth: Optional[int]
+    table_alias_mapping: Optional[Dict[str, str]]
+    in_sql_translation: Optional[bool]
 
     @property
     def local(self):
@@ -34,7 +42,7 @@ def alias_only_context(alias_only=True):
 
 
 @contextmanager
-def model_instantiate_context(ctx):
+def model_instantiate_context(ctx: Context):
     _ctx = ctx.in_model_instantiate
     _depth = ctx.instantiate_depth or 0
     try:
@@ -54,3 +62,14 @@ def table_alias_mapping_context(alias_mapping):
         yield
     finally:
         context.table_alias_mapping = _alias_mapping
+
+
+@contextmanager
+def in_sql_translation_context():
+    _in_sql_translation = context.in_sql_translation
+    try:
+        context.in_sql_translation = True
+        yield
+    finally:
+        context.in_sql_translation = _in_sql_translation
+

@@ -228,8 +228,6 @@ class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
     def get_sql_ast(self):
         model = self.get_model()
         table_name = None if not model else model._get_table_name()
-        alias_mapping = context.table_alias_mapping or {}
-        table_name = alias_mapping.get(table_name, table_name)
         sql_ast = [
             'COLUMN',
             table_name,

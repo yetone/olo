@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 
+from olo import funcs
 from olo.errors import ExpressionError, SupportError
 from olo.funcs import AVG, COUNT, DISTINCT, SUM
 from olo.utils import missing
@@ -86,7 +87,7 @@ class TestQuery(TestCase):
         res = Dummy.query(Dummy.id).order_by(Dummy.age.desc()).all()
         self.assertEqual(len(res), 5)
         self.assertEqual(res[-1], 4)
-        res = Dummy.query('count(distinct name)').all()
+        res = Dummy.query(funcs.COUNT(funcs.DISTINCT(Dummy.name))).all()
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0], 4)
         res = Dummy.query('tags', 'name').filter(age=1).one()
@@ -320,15 +321,13 @@ class TestQuery(TestCase):
             q.get_sql_ast(),
             ['SELECT',
              ['SERIES',
-              ['COLUMN', 'd1', 'id']],
+              ['COLUMN', 'dummy', 'id']],
              ['FROM',
-              ['JOIN',
-               ['ALIAS',
-                ['TABLE', 'dummy'],
-                'd'],
-               ['ALIAS',
-                ['TABLE', 'dummy'],
-                'd1']]],
+              ['JOIN', 'INNER',
+               ['TABLE', 'dummy'],
+               ['TABLE', 'dummy'],
+               [],
+               ]],
              ]
         )
 
@@ -338,11 +337,9 @@ class TestQuery(TestCase):
             q.get_sql_ast(),
             ['SELECT',
              ['SERIES',
-              ['COLUMN', 'd', 'id']],
+              ['COLUMN', 'dummy', 'id']],
              ['FROM',
-              ['ALIAS',
-               ['TABLE', 'dummy'],
-               'd'],
+              ['TABLE', 'dummy'],
               ],
              ['FOR UPDATE']
              ]
@@ -380,7 +377,7 @@ class TestQuery(TestCase):
         Dummy.create(name='foo2', age=2)
         Dummy.create(name='foo3', age=3)
         Dummy.create(name='foo4', age=3)
-        rv = Dummy.query('age', 'count(1)').group_by('age').order_by('age').all()
+        rv = Dummy.query('age', funcs.COUNT(1)).group_by('age').order_by('age').all()
         self.assertEqual(rv, [(1, 1), (2, 2), (3, 2)])
         rv = Dummy.query('name', 'age').group_by('name', 'age').order_by('age').all()
         self.assertEqual(rv, [('foo0', 1), ('foo2', 2),
