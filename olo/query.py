@@ -104,7 +104,10 @@ class JoinChain(SQLASTInterface):
         self.on_ = None
 
     def on(self, on: BinaryExpression) -> None:
-        self.on_ = on
+        if self.on_ is None:
+            self.on_ = on
+            return
+        self.on_ = self.on_ & on
 
     def get_sql_ast(self) -> List:
         from olo.model import Model
@@ -171,7 +174,7 @@ class Query(SQLASTInterface):
 
     @_lambda_eval
     def flat_map(self, query):
-        return self.join(query._model_class).filter(
+        return self.join(query._model_class).on(
             *query._expressions
         ).map(*query._entities)
 
