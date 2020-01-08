@@ -203,6 +203,9 @@ class CacheWrapper(object):
             self._report_miss('get_multi_by', *args, **old_kwargs)
             return self._model_class._get_multi_by(*args, **old_kwargs)
 
+        if not self._cache_client:
+            return fallback()
+
         unique_keys = get_unique_keys(self._model_class)
 
         start = kwargs.pop('start', 0)
@@ -277,6 +280,9 @@ class CacheWrapper(object):
         def fallback():
             self._report_miss('count_by', *expressions, **expression_dict)
             return _get_res()
+
+        if not self._cache_client:
+            return fallback()
 
         str_key = get_str_key(expression_dict)
         unique_keys = get_unique_keys(self._model_class)
