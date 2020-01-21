@@ -777,8 +777,10 @@ class Model(with_metaclass(ModelMeta)):
         return True
 
     def delete(self, **kwargs):
+        # before_delete will return None, so explicit compare with False
         if self.before_delete(**kwargs) is False:
-            return
+            return False
+
         expression = self.unique_expression
         if expression is None:
             raise ExpressionError('Cannot delete this instance because of '  # noqa pragma: no cover

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
-from copy import copy
 from collections import defaultdict
+from copy import copy
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
+
 if TYPE_CHECKING:
     from olo.model import Model
 
@@ -18,8 +19,6 @@ from olo.utils import transform_type, missing, type_checker
 from olo.funcs import attach_func_method
 from olo.errors import ValidationError, DbFieldVersionError
 from olo.migration import MigrationVersion
-from olo.context import context
-
 
 __all__ = ['Field', 'UnionField', 'DbField']
 
@@ -63,7 +62,7 @@ class BaseField(object):
         self.encrypt = encrypt
         self.input = input
         self.output = output
-        self.noneable = noneable
+        self.noneable = noneable if not primary_key else False
         self.attr_name = attr_name or name
         self.version = version
         self.length = length
