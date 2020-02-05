@@ -40,6 +40,8 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
             f_type = 'DATE'
         elif type_ is datetime:
             f_type = 'TIMESTAMP'
+        elif type_ is bytes:
+            f_type = 'BYTEA'
         elif isinstance(type_, type) and issubclass(type_, Enum):
             f_type = camel2underscore(type_.__name__)
         else:
