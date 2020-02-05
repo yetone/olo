@@ -31,7 +31,7 @@ from olo.utils import (cached_property, camel2underscore, deprecation,
                        friendly_repr, missing, override,
                        readonly_cached_property, type_checker)
 
-VALID_TYPES = str_types + (int, float, long, date)
+VALID_TYPES = str_types + (bytes, int, float, long, date)
 PATTERN_N_NAME = re.compile('s$')
 
 
