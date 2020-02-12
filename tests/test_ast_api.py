@@ -106,3 +106,9 @@ class TestASTAPI(TestCase):
                     yield funcs.COUNT(funcs.DISTINCT(Foo.id))
 
         self.is_same_q(q1, q2)
+
+    def test_op_apply(self):
+        args = [1]
+        q1 = select(f for f in Foo if f.id == args[0])
+        q2 = Foo.query.filter(id=args[0])
+        self.is_same_q(q1, q2)

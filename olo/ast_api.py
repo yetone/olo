@@ -58,7 +58,7 @@ def select_(*args):
 def select(*args):
     assert len(args) > 0, 'select take at least one argument!'
     gen, globals, locals = get_globals_and_locals(
-        args, kwargs=None, frame_depth=3,
+        args, kwargs=None, frame_depth=2,
         from_generator=isinstance(args[0], types.GeneratorType))
     tree, external_names, cells = decompile(gen)
     scope = dict(globals)

@@ -6,6 +6,7 @@ import operator
 from functools import update_wrapper
 
 from olo.compat import reduce
+from olo.libs.compiler import ast
 from olo.libs.compiler.utils import throw
 from olo.libs.compiler.eval import eval_src, get_prelude
 from olo.libs.compiler.translators.ast_translator import ASTTranslator
@@ -237,6 +238,17 @@ class QueryTranslator(ASTTranslator):
                 kwargs = node.dstar_args.factory()
 
             return node.node.factory()(*args, **kwargs)
+
+        return f
+
+    def postSubscript(self, node):
+        def f():
+            assert node.flags == 'OP_APPLY'
+            assert isinstance(node.subs, list)
+            v = node.expr.factory()
+            # TODO: support multi subs
+            sub = node.subs[0]
+            return v[sub.factory()]
 
         return f
 
