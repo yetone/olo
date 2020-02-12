@@ -247,6 +247,7 @@ class QueryTranslator(ASTTranslator):
             assert isinstance(node.subs, list)
             v = node.expr.factory()
             # TODO: support multi subs
+            assert len(node.subs) == 1
             sub = node.subs[0]
             return v[sub.factory()]
 
