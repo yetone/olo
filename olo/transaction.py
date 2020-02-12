@@ -67,4 +67,6 @@ class Transaction(threading.local):
                 self._curs.pop()
 
             if self.conn is not None:
-                self.conn.release()
+                conn = self.conn
+                self.conn = None
+                conn.release()
