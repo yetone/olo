@@ -1,17 +1,25 @@
+from __future__ import annotations
+
 import threading
 
 from functools import wraps
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from olo.database import BaseDataBase
 
 
 class Transaction(threading.local):
-    def __init__(self, db):
+    def __init__(self, db: BaseDataBase):
         super(Transaction, self).__init__()
         self._db = db
+        self._entered = False
         self._canceled = False
         self._curs = set()
         self.conn = None
 
     def _begin(self):
+        self._entered = True
         self._db.begin()
 
     def get_curs(self):
@@ -41,6 +49,9 @@ class Transaction(threading.local):
         return _
 
     def __enter__(self):
+        if self._db.in_transaction():
+            return self._db.get_last_transaction()
+
         self._orig_autocommit = self._db.autocommit
         self._db.autocommit = False
         self._begin()
@@ -48,6 +59,10 @@ class Transaction(threading.local):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self._entered:
+            return
+
+        self._entered = False
         depth = self._db.transaction_depth
 
         try:
