@@ -39,8 +39,8 @@ class PostgreSQLConnProxy(MySQLConnProxy):
             cur = self.conn.cursor()
             cur.execute('SELECT 1')
             return True
-        except psycopg2.OperationalError:
-            pass
+        except psycopg2.OperationalError as e:
+            logger.error('ping pg connection failed: %s', str(e))
         return False
 
 
@@ -87,7 +87,7 @@ class PostgreSQLDataBase(BaseDataBase):
             try:
                 with self.transaction():
                     c = self.get_cursor()
-                    c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+                    c.execute('SELECT table_name FROM information_schema.tables WHERE table_schema = %s', ('public',))
                 self._tables = {t for t, in c}
             except Exception:  # pragma: no cover
                 return set()  # pragma: no cover

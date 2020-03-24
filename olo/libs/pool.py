@@ -163,8 +163,10 @@ class Pool(object):
 
     def ping_conn(self, conn):
         try:
-            conn.ping()
-            return True
+            r = conn.ping()
+            if not isinstance(r, bool):
+                return True
+            return r
         except Exception:
             return False
 
