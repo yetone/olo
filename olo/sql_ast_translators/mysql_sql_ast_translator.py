@@ -241,11 +241,31 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         sql_pieces, params = self.reduce(args)
         return ',\n'.join('  {}'.format(p) for p in sql_pieces if p), params
 
+    def post_MODIFY_FIELD(self, table_name, name, type_,
+                          length, charset, default,
+                          noneable, auto_increment, deparse):
+        sql_piece, params = self.post_FIELD(name, type_, length, charset, default, noneable, auto_increment, deparse)
+        table_name = self.post_QUOTE(table_name)[0]
+        return f'ALTER TABLE {table_name} MODIFY {sql_piece}', params
+
+    def post_ADD_FIELD(self, table_name, name, type_,
+                       length, charset, default,
+                       noneable, auto_increment, deparse):
+        sql_piece, params = self.post_FIELD(name, type_, length, charset, default, noneable, auto_increment, deparse)
+        table_name = self.post_QUOTE(table_name)[0]
+        return f'ALTER TABLE {table_name} ADD {sql_piece}', params
+
     def post_FIELD(self, name, type_,
                    length, charset, default,
                    noneable, auto_increment, deparse):
-        # pylint: disable=too-many-statements
         f_schema = self.post_QUOTE(name)[0]
+        sql_piece, params = self.post_FIELD_TYPE(type_, length, charset, default, noneable, auto_increment, deparse)
+        return f'{f_schema} {sql_piece}', params
+
+    def post_FIELD_TYPE(self, type_,
+                        length, charset, default,
+                        noneable, auto_increment, deparse):
+        # pylint: disable=too-many-statements
         if type_ in (int, long):
             if length is not None:
                 if length < 2:
@@ -274,7 +294,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         else:
             f_type = 'TEXT'
 
-        f_schema += ' ' + f_type
+        f_schema = f_type
         if charset is not None:
             f_schema += ' CHARACTER SET {}'.format(charset)
         if not noneable:
