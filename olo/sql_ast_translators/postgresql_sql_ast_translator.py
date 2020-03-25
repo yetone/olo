@@ -10,11 +10,18 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
     def post_QUOTE(self, value):
         return '"{}"'.format(value), []
 
-    def post_FIELD(self, name, type_,
-                   length, charset, default,
-                   noneable, auto_increment, deparse):
+    def post_MODIFY_FIELD(self, table_name, name, type_,
+                          length, charset, default,
+                          noneable, auto_increment, deparse):
+        table_name = self.post_QUOTE(table_name)[0]
+        name = self.post_QUOTE(name)[0]
+        sql_piece, params = self.post_FIELD_TYPE(type_, length, charset, default, noneable, auto_increment, deparse)
+        return f'ALTER TABLE {table_name} ALTER COLUMN {name} TYPE {sql_piece}', params
+
+    def post_FIELD_TYPE(self, type_,
+                        length, charset, default,
+                        noneable, auto_increment, deparse):
         # pylint: disable=too-many-statements
-        f_schema = self.post_QUOTE(name)[0]
         if type_ in (int, long):
             if auto_increment:
                 f_type = 'SERIAL'
@@ -47,7 +54,7 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
         else:
             f_type = 'TEXT'
 
-        f_schema += ' ' + f_type
+        f_schema = f_type
         if charset is not None:
             # TODO
             # f_schema += ' CHARACTER SET {}'.format(charset)

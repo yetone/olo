@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from datetime import datetime, date
 from functools import wraps
 from queue import Queue, Empty
-from typing import TYPE_CHECKING, Optional, Tuple, Set, List
+from typing import TYPE_CHECKING, Optional, Tuple, Set, List, Any, Callable
 
 from olo.sql_ast_translators.sql_ast_translator import AST
 
@@ -200,6 +202,36 @@ class BaseDataBase(object):
                 return set()  # pragma: no cover
         return self._tables
 
+    PATTERN_TYPE = re.compile(r'(?P<type>[a-zA-Z]+)(\((?P<len>\d+)\))?')
+
+    def get_fields(self, table_name: str) -> List[Tuple[str, type, Optional[int]]]:
+        fields = []
+        try:
+            with self.transaction():
+                c = self.get_cursor()
+                c.execute(f'DESC `{table_name}`')
+                for name, type_str, _, _, _, _ in c:
+                    m = self.PATTERN_TYPE.search(type_str)
+                    if not m:
+                        continue
+                    type_ = (m.group('type') or '').lower()
+                    len_ = m.group('len')
+                    if not len_:
+                        f_len = None
+                    else:
+                        f_len = int(len_)
+                    f_type = str
+                    if type_ in ('int', 'smallint', 'tinyint'):
+                        f_type = int
+                    elif type_ in ('datetime', 'timestamp'):
+                        f_type = datetime
+                    elif type_ in ('date',):
+                        f_type = date
+                    fields.append((name, f_type, f_len))
+        except Exception as e:  # pragma: no cover
+            logger.error('get fields from %s failed: %s', table_name, str(e))
+        return fields
+
     def get_index_rows(self, table_name):
         if table_name not in self._index_rows_mapping:
             try:
@@ -245,8 +277,33 @@ class BaseDataBase(object):
     def to_db_types_sql_asts(self) -> List[AST]:
         return []
 
+    @classmethod
+    def _get_field_type_params(cls, f: BaseField) -> Tuple:
+        return f.type, f.length, f.charset, f.default, f.noneable, f.auto_increment, f.deparse
+
     def to_db_table_schema_sql_asts(self) -> List[AST]:
-        return [self._to_db_table_schema_sql_ast(m) for m in self._models]
+        exist_table_names = self.get_tables()
+        asts = [self._to_db_table_schema_sql_ast(m) for m in self._models
+                if m._get_table_name() not in exist_table_names]
+        for m in self._models:
+            table_name = m._get_table_name()
+            if table_name not in exist_table_names:
+                continue
+            exist_fields = self.get_fields(table_name)
+            exist_fields_mapping = {field[0]: field for field in exist_fields}
+            for attr_name in m.__ordered_field_attr_names__:
+                f: BaseField = getattr(m, attr_name)
+                if f.name not in exist_fields_mapping:
+                    asts.append([
+                        'ADD_FIELD', table_name, f.name
+                    ] + list(self._get_field_type_params(f)))
+                    continue
+                exist_field = exist_fields_mapping[f.name]
+                if f.type is str and exist_field[2] != f.length:
+                    asts.append([
+                        'MODIFY_FIELD', table_name, f.name
+                    ] + list(self._get_field_type_params(f)))
+        return asts
 
     @classmethod
     def _to_db_table_schema_sql_ast(cls, model: Model) -> AST:
@@ -259,10 +316,8 @@ class BaseDataBase(object):
             f = getattr(model, k)
 
             f_schema_ast = [
-                'FIELD', f.name, f.type, f.length,
-                f.charset, f.default, f.noneable,
-                f.auto_increment, f.deparse
-            ]
+                'FIELD', f.name
+            ] + list(cls._get_field_type_params(f))
 
             create_definition_ast.append(f_schema_ast)
 

@@ -93,6 +93,22 @@ class PostgreSQLDataBase(BaseDataBase):
                 return set()  # pragma: no cover
         return self._tables
 
+    def get_fields(self, table_name: str) -> List[Tuple[str, type, Optional[int]]]:
+        fields = []
+        try:
+            with self.transaction():
+                c = self.get_cursor()
+                c.execute('SELECT column_name, data_type, character_maximum_length FROM information_schema.COLUMNS '
+                          'WHERE table_name = %s', (table_name,))
+                for c_name, data_type, data_length in c:
+                    f_type = str
+                    if data_type in ('integer', 'smallint'):
+                        f_type = int
+                    fields.append((c_name, f_type, data_length))
+        except Exception as e:  # pragma: no cover
+            logger.error('get fields from %s failed: %s', table_name, str(e))
+        return fields
+
     def get_index_rows(self, table_name):
         pk_name = f'{table_name}_pkey'
         if table_name not in self._index_rows_mapping:

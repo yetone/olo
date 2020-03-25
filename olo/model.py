@@ -7,7 +7,7 @@ from copy import copy
 from datetime import date, datetime
 from functools import wraps
 from itertools import chain, product
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Set, Union, Any, Callable
 
 from six import with_metaclass
 
@@ -257,7 +257,9 @@ def _create_n_property(method, name):
     return cached_property(f)
 
 
-def _collect_fields(cls, attrs):
+def _collect_fields(cls, attrs) -> Tuple[
+    Set[str], Set[str], Set[Union[BaseField, Any]], Dict[str, Any], Set[str], Dict[str, Callable], Set[str], list, Dict[
+        Any, str], Dict[str, BaseField]]:
     fields = set()
     db_fields = set()
     primary_key = set()
