@@ -8,6 +8,9 @@ from olo.utils import car, cdr, is_sql_ast, friendly_repr
 AST = List
 
 
+MODIFY_OPERATES = frozenset({'INSERT', 'DELETE', 'UPDATE'})
+
+
 def _detect_table_alias(sql_ast: AST, rev_alias_mapping: Optional[Dict[str, str]] = None) -> AST:
     if not is_sql_ast(sql_ast):
         return sql_ast
@@ -30,6 +33,9 @@ def _detect_table_alias(sql_ast: AST, rev_alias_mapping: Optional[Dict[str, str]
         if is_sql_ast(sql_ast[1]) and sql_ast[1][0] == 'TABLE':
             rev_alias_mapping[sql_ast[2]] = sql_ast[1][1]
         return sql_ast
+
+    if sql_ast[0] in MODIFY_OPERATES and len(sql_ast) >= 2:
+        return sql_ast[:2] + [_detect_table_alias(x, rev_alias_mapping=rev_alias_mapping) for x in sql_ast[2:]]
 
     return [_detect_table_alias(x, rev_alias_mapping=rev_alias_mapping)
             for x in sql_ast]
