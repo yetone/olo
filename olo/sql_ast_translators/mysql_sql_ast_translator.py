@@ -271,7 +271,7 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         f_default, default_params = self.post_FIELD_DEFAULT(f_type, default, noneable, deparse)
 
         if f_default:
-            f_schema += f'DEFAULT {f_default}'
+            f_schema += f' DEFAULT {f_default}'
             params += default_params
 
         if auto_increment:
