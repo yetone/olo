@@ -14,13 +14,30 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
                           length, charset, default,
                           noneable, auto_increment, deparse):
         table_name = self.post_QUOTE(table_name)[0]
-        name = self.post_QUOTE(name)[0]
-        sql_piece, params = self.post_FIELD_TYPE(type_, length, charset, default, noneable, auto_increment, deparse)
-        return f'ALTER TABLE {table_name} ALTER COLUMN {name} TYPE {sql_piece}', params
+        f_name = self.post_QUOTE(name)[0]
+        type_sql_piece, params = self.post_FIELD_TYPE(type_, length, auto_increment)
+        return f'ALTER TABLE {table_name} ALTER COLUMN {f_name} TYPE {type_sql_piece}', params
 
-    def post_FIELD_TYPE(self, type_,
-                        length, charset, default,
-                        noneable, auto_increment, deparse):
+    def post_FIELD(self, name, type_,
+                   length, charset, default,
+                   noneable, auto_increment, deparse):
+        f_name = self.post_QUOTE(name)[0]
+        f_type, params = self.post_FIELD_TYPE(type_, length, auto_increment)
+
+        f_schema = f_type
+
+        if not noneable:
+            f_schema += ' NOT NULL'
+
+        f_default, default_params = self.post_FIELD_DEFAULT(f_type, default, noneable, deparse)
+
+        if f_default:
+            f_schema += f' DEFAULT {f_default}'
+            params += default_params
+
+        return f'{f_name} {f_schema}', params
+
+    def post_FIELD_TYPE(self, type_, length, auto_increment):
         # pylint: disable=too-many-statements
         if type_ in (int, long):
             if auto_increment:
@@ -54,30 +71,7 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
         else:
             f_type = 'TEXT'
 
-        f_schema = f_type
-        if charset is not None:
-            # TODO
-            # f_schema += ' CHARACTER SET {}'.format(charset)
-            pass
-
-        if not noneable:
-            f_schema += ' NOT NULL'
-
-        if f_type not in (
-                'BLOB', 'TEXT', 'GEOMETRY', 'JSON'
-        ):
-            if not callable(default):
-                if default is not None or noneable:
-                    if default is not None:
-                        f_schema += ' DEFAULT \'{}\''.format(
-                            deparse(default)
-                        )
-                    else:
-                        f_schema += ' DEFAULT NULL'
-            elif default == datetime.now:
-                f_schema += ' DEFAULT CURRENT_TIMESTAMP'
-
-        return f_schema, []
+        return f_type, []
 
     def post_RETURNING(self, field_name):
         return f'RETURNING {self.post_QUOTE(field_name)[0]}', []
