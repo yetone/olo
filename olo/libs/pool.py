@@ -141,8 +141,8 @@ class Pool(object):
                         # FIXME
                         try:
                             self.destroy_conn(conn)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.error('cannot destroy conn: %s', str(e))
                         count += 1
                         time.sleep(0.5)
                         return self.acquire_conn()

@@ -247,7 +247,9 @@ class ConstField(Field):
         return ['VALUE', self._value]
 
 
-class UnionField(BaseField, SQLASTInterface):
+class UnionField(BaseField, UnaryOperationMixin, BinaryOperationMixin, SQLASTInterface):
+    UnaryExpression = UnaryExpression
+    BinaryExpression = BinaryExpression
 
     def __init__(self, *fields):
         self.fields = fields
