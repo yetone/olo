@@ -5,28 +5,6 @@ from olo.query import Query
 from olo.field import Field
 
 
-def _order_by_to_str(item):
-    if hasattr(item, 'attr_name'):
-        return item.attr_name  # pragma: no cover
-
-    _str = (
-        item.value.attr_name if hasattr(item.value, 'attr_name')
-        else _order_by_to_str(item.value)
-    )
-
-    if item.operator == 'DESC':
-        return '-{}'.format(_str)
-
-    return _str  # pragma: no cover
-
-
-def order_by_to_strs(order_by):
-    res = []
-    for exp in order_by:
-        res.append(_order_by_to_str(exp))
-    return res
-
-
 class CachedQuery(Query):
 
     def _can_be_cached(self):  # pylint: disable=too-many-return-statements
@@ -101,9 +79,8 @@ class CachedQuery(Query):
         fallback = lambda: super(CachedQuery, self).all()  # noqa
         if not self._can_be_cached():
             return fallback()  # pragma: no cover
-        order_by = order_by_to_strs(self._order_by)
         return self._model_class.cache.gets_by(
-            order_by=order_by,
+            order_by=self._order_by,
             start=self._offset,
             limit=self._limit,
             **self._get_expression_dict()
