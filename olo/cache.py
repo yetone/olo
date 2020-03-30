@@ -23,6 +23,28 @@ def wash_kwargs(func):
     return _
 
 
+def _order_by_to_str(item):
+    if hasattr(item, 'attr_name'):
+        return item.attr_name  # pragma: no cover
+
+    _str = (
+        item.value.attr_name if hasattr(item.value, 'attr_name')
+        else _order_by_to_str(item.value)
+    )
+
+    if item.operator == 'DESC':
+        return '-{}'.format(_str)
+
+    return _str  # pragma: no cover
+
+
+def order_by_to_strs(order_by):
+    res = []
+    for exp in order_by:
+        res.append(_order_by_to_str(exp))
+    return res
+
+
 class CacheWrapper(object):
     MAX_COUNT = 200
 
@@ -211,11 +233,13 @@ class CacheWrapper(object):
         start = kwargs.pop('start', 0)
         limit = kwargs.pop('limit', None)
         order_by = kwargs.pop('order_by', None)
+        order_by_str = ''
         if order_by is not None:
             if isinstance(order_by, list):
                 order_by = tuple(order_by)
             elif not isinstance(order_by, tuple):
                 order_by = (order_by,)
+            order_by_str = order_by_to_strs(order_by)
 
         if not order_by:
             order_by = None
@@ -232,8 +256,8 @@ class CacheWrapper(object):
             args or
             str_key not in index_keys or
             (
-                order_by and
-                order_by not in self._model_class.__order_bys__
+                order_by_str and
+                order_by_str not in self._model_class.__order_bys__
             )
         ):
             return fallback()
@@ -242,7 +266,7 @@ class CacheWrapper(object):
 
         # pylint: disable=E1102
         key = self._gen_cache_key(_olo_suffix='ids',
-                                  order_by=order_by, **kwargs)
+                                  order_by=order_by_str, **kwargs)
         # pylint: enable=E1102
 
         if start is None:
