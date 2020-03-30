@@ -6,8 +6,10 @@ from functools import wraps
 
 from olo.compat import izip, str_types, iteritems
 from olo.events import after_delete, after_insert, after_update, before_update
+from olo.expression import UnaryExpression
+from olo.field import BaseField
 from olo.key import StrKey
-from olo.errors import CacheError
+from olo.errors import CacheError, ORMError
 from olo.logger import logger
 from olo.session import QuerySession
 from olo.utils import missing, friendly_repr
@@ -24,25 +26,33 @@ def wash_kwargs(func):
 
 
 def _order_by_to_str(item):
-    if hasattr(item, 'attr_name'):
+    if isinstance(item, str_types):
+        return item
+
+    if isinstance(item, BaseField):
         return item.attr_name  # pragma: no cover
 
-    _str = (
-        item.value.attr_name if hasattr(item.value, 'attr_name')
-        else _order_by_to_str(item.value)
-    )
+    if isinstance(item, UnaryExpression):
+        _str = (
+            item.value.attr_name if hasattr(item.value, 'attr_name')
+            else _order_by_to_str(item.value)
+        )
 
-    if item.operator == 'DESC':
-        return '-{}'.format(_str)
+        if item.operator == 'DESC':
+            return '-{}'.format(_str)
 
-    return _str  # pragma: no cover
+        return _str  # pragma: no cover
+
+    raise ORMError(f'this is not a valid order_by: {item}')
 
 
 def order_by_to_strs(order_by):
     res = []
     for exp in order_by:
         res.append(_order_by_to_str(exp))
-    return res
+    if not res:
+        return None
+    return tuple(res)
 
 
 class CacheWrapper(object):
@@ -233,7 +243,7 @@ class CacheWrapper(object):
         start = kwargs.pop('start', 0)
         limit = kwargs.pop('limit', None)
         order_by = kwargs.pop('order_by', None)
-        order_by_str = ''
+        order_by_str = None
         if order_by is not None:
             if isinstance(order_by, list):
                 order_by = tuple(order_by)

@@ -255,7 +255,7 @@ class UnionField(BaseField, UnaryOperationMixin, BinaryOperationMixin, SQLASTInt
     def __init__(self, *fields):
         self.fields = fields
         super(UnionField, self).__init__(Field)
-        self.attr_name = '({})'.format(','.join(f.attr_name for f in self.fields))
+        self.attr_name = '({})'.format(tuple(f.attr_name for f in self.fields))
 
     def in_(self, other):
         return BinaryExpression(self, other, 'IN')
