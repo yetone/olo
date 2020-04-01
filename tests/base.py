@@ -128,6 +128,7 @@ class Foo(BaseModel):
     age_str = Field(int, noneable=True, default=1, output=str, length=11)
     key = Field(str, noneable=True, default=lambda: str(uuid4()), length=255)
     prop1 = DbField(list, noneable=True)
+    boolean = Field(bool, default=False)
 
     __unique_keys__ = (
         (name, 'age'),

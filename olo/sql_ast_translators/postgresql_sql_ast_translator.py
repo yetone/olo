@@ -68,6 +68,8 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
             f_type = 'BYTEA'
         elif isinstance(type_, type) and issubclass(type_, Enum):
             f_type = camel2underscore(type_.__name__)
+        elif type_ is bool:
+            f_type = 'BOOLEAN'
         else:
             f_type = 'TEXT'
 
