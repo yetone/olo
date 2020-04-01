@@ -5,7 +5,7 @@ import json
 from collections import defaultdict
 from copy import copy
 from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Callable
 
 from olo.orm_types import TrackedValue
 from olo.types.json import JSONLike
@@ -74,6 +74,8 @@ class BaseField(object):
         self._alias_name = None
         self._model_ref = lambda: None
         self.AES_KEY = ''
+        self._getter = None
+        self._setter = None
 
         if self.choices is None and isinstance(self.type, type) and issubclass(self.type, Enum):
             self.choices = self.type
@@ -155,9 +157,23 @@ class BaseField(object):
     def mark_dirty(self, obj):
         obj._dirty_fields.add(self.attr_name)
 
+    def getter(self, func):
+        self._getter = func
+        return self
+
+    def setter(self, func):
+        self._setter = func
+        return self
+
     def __get__(self, obj, objtype):
         if obj is None:
             return self
+        v = self._get(obj, objtype)
+        if self._getter is not None:
+            return self._getter(obj, v)
+        return v
+
+    def _get(self, obj, objtype):
         attr_name = self.attr_name
         data = self._get_data(obj)
         parsed_data = self._get_parsed_data(obj)
@@ -188,6 +204,11 @@ class BaseField(object):
                     self.name
                 )
             )
+        if self._setter is not None:
+            value = self._setter(obj, value)
+        return self._set(obj, value)
+
+    def _set(self, obj, value):
         if obj._orig is None:
             obj._set_orig()
         attr_name = self.attr_name
@@ -527,14 +548,12 @@ class DbField(BaseField):
         db_key = self._get_db_field_key(obj)
         db.db_delete(db_key)
 
-    def __get__(self, obj, objtype):
-        if obj is None:
-            return self
+    def _get(self, obj, objtype):
         _prefetch_db_data(obj)
         attr_name = self.attr_name
         data = self._get_data(obj)
         if attr_name in data:
-            return super(DbField, self).__get__(obj, objtype)
+            return super(DbField, self)._get(obj, objtype)
         v = self.db_get(obj, objtype)
         data[attr_name] = v
         return v
@@ -574,7 +593,7 @@ class DbField(BaseField):
 
     def __delete__(self, obj):
         if obj is None:
-            raise AttributeError  # pragma: no cover
+            raise AttributeError(self.attr_name)  # pragma: no cover
         attr_name = self.attr_name
         if obj.before_update(**{
             attr_name: None

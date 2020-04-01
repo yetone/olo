@@ -259,7 +259,7 @@ def _create_n_property(method, name):
 
 def _collect_fields(cls, attrs) -> Tuple[
     Set[str], Set[str], Set[Union[BaseField, Any]], Dict[str, Any], Set[str], Dict[str, Callable], Set[str], list, Dict[
-        Any, str], Dict[str, BaseField]]:
+        Any, str], Dict[str, BaseField], Dict[str, BaseField]]:
     fields = set()
     db_fields = set()
     primary_key = set()
@@ -270,6 +270,7 @@ def _collect_fields(cls, attrs) -> Tuple[
     field_objs = []
     field_name_map = {}
     encrypted_fields = {}
+    setter_fields = {}
 
     for k in dir(cls) if not cls.__abstract__ else []:
         v = getattr(cls, k)
@@ -284,10 +285,12 @@ def _collect_fields(cls, attrs) -> Tuple[
                     field_objs.append(v)
                 elif isinstance(v, DbField):
                     db_fields.add(k)
-                if isinstance(v, BaseField) and v.encrypt:
+                if v.encrypt:
                     encrypted_fields[k] = v
                 if v.choices is not None:
                     choices_field_sets.add(k)
+                if v._setter is not None:
+                    setter_fields[k] = v
             if v.is_primary_key():
                 primary_key.add(v)
             if v.on_update is not None:
@@ -316,7 +319,7 @@ def _collect_fields(cls, attrs) -> Tuple[
         fields, db_fields, primary_key,
         on_updates, choices_field_sets, validates,
         exported_property_names, ordered_field_attr_names,
-        field_name_map, encrypted_fields,
+        field_name_map, encrypted_fields, setter_fields,
     )
 
 
@@ -395,6 +398,7 @@ class ModelMeta(type):
             ordered_field_attr_names,
             field_name_map,
             encrypted_fields,
+            setter_fields,
         ) = _collect_fields(cls, attrs)
 
         cls.__fields__ = fields
@@ -406,6 +410,7 @@ class ModelMeta(type):
         cls.__ordered_field_attr_names__ = ordered_field_attr_names
         cls.__field_name_map__ = field_name_map
         cls.__encrypted_fields__ = encrypted_fields
+        cls.__setter_fields__ = setter_fields
 
         if '__table_name__' not in attrs:
             cls.__table_name__ = camel2underscore(class_name)
@@ -553,6 +558,13 @@ class Model(with_metaclass(ModelMeta)):
         self._init()
         self._data = attrs
 
+        if self._olo_is_new:
+            for k in self.__setter_fields__:
+                v = attrs.get(k, missing)
+                if v is missing:
+                    continue
+                setattr(self, k, v)
+
     def _init(self):
         self._parsed_data = {}
         self._dirty_fields = set()
@@ -671,6 +683,14 @@ class Model(with_metaclass(ModelMeta)):
         if self.before_update(**attrs) is False:
             self._rollback()
             return False
+
+        for k in self.__setter_fields__:
+            v = attrs.get(k, missing)
+            if v is missing:
+                continue
+            f = getattr(self.__class__, k)
+            v = f._setter(self, v)
+            attrs[k] = v
 
         db = self._get_db()
 

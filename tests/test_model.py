@@ -933,3 +933,18 @@ class TestModel(TestCase):
         Dummy._options.report('xixi')
         _Dummy._options.report('xixi')
         self.assertTrue(_Dummy._options._report.called)
+
+    def test_field_getter(self):
+        f = Foo.create(test_getter=1)
+        self.assertEqual(f.test_getter, 2)
+        f.update(test_getter=2)
+        f = Foo.get(f.id)
+        self.assertEqual(f.test_getter, 3)
+
+    def test_field_setter(self):
+        f = Foo.create(test_setter=1)
+        self.assertEqual(f.test_setter, 0)
+        f.update(test_setter=3)
+        self.assertEqual(f.test_setter, 2)
+        f = Foo.get(f.id)
+        self.assertEqual(f.test_setter, 2)
