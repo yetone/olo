@@ -306,6 +306,8 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
             f_type = 'TIMESTAMP'
         elif isinstance(type_, type) and issubclass(type_, Enum):
             f_type = 'VARCHAR(128)'
+        elif type_ is bool:
+            f_type = 'BOOLEAN'
         else:
             f_type = 'TEXT'
 
@@ -315,21 +317,24 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
                            noneable, deparse):
 
         f_default = ''
+        params = []
         if f_type not in (
                 'BLOB', 'TEXT', 'GEOMETRY', 'JSON'
         ):
             if not callable(default):
                 if default is not None or noneable:
                     if default is not None:
-                        f_default = '\'{}\''.format(
-                            deparse(default)
-                        )
+                        f_default = '%s'
+                        params.append(default)
+                        # f_default = '\'{}\''.format(
+                        #     deparse(default)
+                        # )
                     else:
                         f_default = 'NULL'
             elif default == datetime.now:
                 f_default = 'CURRENT_TIMESTAMP'
 
-        return f_default, []
+        return f_default, params
 
     def post_KEY(self, type_, name, field_names):
         if type_ == 'PRIMARY':
