@@ -49,7 +49,8 @@ class TestHybrid(TestCase):
               ['COLUMN', 'foo', 'name'],
               ['COLUMN', 'foo', 'age'],
               ['COLUMN', 'foo', 'age_str'],
-              ['COLUMN', 'foo', 'key']
+              ['COLUMN', 'foo', 'key'],
+              ['COLUMN', 'foo', 'boolean']
               ],
              ['FROM',
               ['TABLE', 'foo'],
