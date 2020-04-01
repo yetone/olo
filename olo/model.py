@@ -19,7 +19,7 @@ from olo.compat import (str_types, iteritems, iterkeys, itervalues, izip,
 from olo.context import Context, context, model_instantiate_context
 from olo.errors import DeparseError, ExpressionError, InvalidFieldError, ORMError
 from olo.events import after_delete, after_insert, after_update, before_update
-from olo.expression import BinaryExpression, Expression
+from olo.expression import Expression
 from olo.ext.exported import IS_EXPORTED_PROPERTY
 from olo.ext.n import N
 from olo.field import BaseField, DbField, Field, UnionField
@@ -31,7 +31,7 @@ from olo.utils import (cached_property, camel2underscore, deprecation,
                        friendly_repr, missing, override,
                        readonly_cached_property, type_checker)
 
-VALID_TYPES = str_types + (bytes, int, float, long, date)
+VALID_TYPES = str_types + (bytes, int, float, long, date, datetime, bool)
 PATTERN_N_NAME = re.compile('s$')
 
 
