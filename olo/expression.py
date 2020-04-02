@@ -32,15 +32,17 @@ class Expression(SQLASTInterface, ABC):
 
 class UnaryExpression(Expression):
 
-    def __init__(self, value: Union[BinaryExpression, Field], operator: str) -> None:
+    def __init__(self, value: Union[BinaryExpression, Field], operator: str, suffix=True) -> None:
         self.value = value
         self.operator = operator
+        self.suffix = suffix
 
     def get_sql_ast(self):
         return [
             'UNARY_OPERATE',
             self.value.get_sql_ast(),
-            self.operator
+            self.operator,
+            self.suffix
         ]
 
     def __neg__(self):

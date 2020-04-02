@@ -6,11 +6,9 @@ import operator
 from functools import update_wrapper
 
 from olo.compat import reduce
-from olo.libs.compiler import ast
-from olo.libs.compiler.utils import throw
 from olo.libs.compiler.eval import eval_src, get_prelude
 from olo.libs.compiler.translators.ast_translator import ASTTranslator
-
+from olo.libs.compiler.utils import throw
 
 uops = [
     'not'
@@ -22,7 +20,7 @@ binops = [
     'is', 'is not', 'in', 'not in'
 ]
 
-binops_mappig = {
+binops_mapping = {
     'is': '==',
     'is not': '!=',
     'in': 'in_',
@@ -32,11 +30,12 @@ binops_mappig = {
 
 def build_binop_factory(op):
     src = 'lambda x, y: x %s y'
-    if op in (
-            'in', 'not in'
-    ):
-        src = 'lambda x, y: x.%s(y)'
-    op = binops_mappig.get(op, op)
+    if op == 'in':
+        src = 'lambda x, y: x.%s(y) if hasattr(x, "in_") else y.contains_(x)'
+    elif op == 'not in':
+        src = 'lambda x, y: x.%s(y) if hasattr(x, "not_in_") else y.not_contains_(x)'
+
+    op = binops_mapping.get(op, op)
 
     return eval_src(src % op)
 

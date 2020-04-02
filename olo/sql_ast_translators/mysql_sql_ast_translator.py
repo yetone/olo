@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, date
 from enum import Enum
 
@@ -61,12 +62,14 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         sql_pieces, params = self.reduce(args)
         return ', '.join(sql_pieces), params
 
-    def post_COLUMN(self, table_name, field_name):
+    def post_COLUMN(self, table_name, field_name, path=None, type_=None):
         if table_name is None:
             return self.post_QUOTE(field_name)
         alias_mapping = context.table_alias_mapping or {}
         table_name = alias_mapping.get(table_name, table_name)
-        return '{}.{}'.format(self.post_QUOTE(table_name)[0], self.post_QUOTE(field_name)[0]), []
+        sql = '{}.{}'.format(self.post_QUOTE(table_name)[0], self.post_QUOTE(field_name)[0])
+        params = []
+        return sql, params
 
     def post_ALIAS(self, raw, alias):
         if context.alias_only:
@@ -151,10 +154,12 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
             offset_params + limit_params
         )
 
-    def post_UNARY_OPERATE(self, value, operation):
+    def post_UNARY_OPERATE(self, value, operation, suffix=True):
         with alias_only_context(True):  # pylint: disable=E
             sql_piece, params = self.translate(value)
-        return '{} {}'.format(sql_piece, operation), params
+        if suffix:
+            return '{} {}'.format(sql_piece, operation), params
+        return '{} ({})'.format(operation, sql_piece), params
 
     def post_BINARY_OPERATE(self, operator, left, right):
         left_sql_piece, left_params = self.translate(left)
@@ -319,16 +324,20 @@ class MySQLSQLASTTranslator(SQLASTTranslator):
         f_default = ''
         params = []
         if f_type not in (
-                'BLOB', 'TEXT', 'GEOMETRY', 'JSON'
+                'BLOB', 'GEOMETRY'
         ):
             if not callable(default):
                 if default is not None or noneable:
                     if default is not None:
                         f_default = '%s'
-                        params.append(default)
-                        # f_default = '\'{}\''.format(
-                        #     deparse(default)
-                        # )
+                        if f_type == 'JSONB':
+                            f_default = '%s::jsonb'
+                        if f_type in ('TEXT', 'JSONB'):
+                            params.append(json.dumps(default))
+                        elif isinstance(default, Enum):
+                            params.append(default.name)
+                        else:
+                            params.append(default)
                     else:
                         f_default = 'NULL'
             elif default == datetime.now:
