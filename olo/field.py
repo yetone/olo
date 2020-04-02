@@ -7,6 +7,9 @@ from copy import copy
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
+from olo.orm_types import TrackedValue
+from olo.types.json import JSONLike
+
 if TYPE_CHECKING:
     from olo.model import Model
 
@@ -149,6 +152,9 @@ class BaseField(object):
     def _get_parsed_data(cls, obj):
         return obj._parsed_data
 
+    def mark_dirty(self, obj):
+        obj._dirty_fields.add(self.attr_name)
+
     def __get__(self, obj, objtype):
         if obj is None:
             return self
@@ -197,7 +203,7 @@ class BaseField(object):
             attr_name not in obj._dirty_fields and
             not obj._olo_is_new
         ):
-            obj._dirty_fields.add(attr_name)
+            self.mark_dirty(obj)
         data[attr_name] = parsed_value
         parsed_data.pop(attr_name, None)
 
@@ -257,14 +263,105 @@ class UnionField(BaseField, UnaryOperationMixin, BinaryOperationMixin, SQLASTInt
         super(UnionField, self).__init__(Field)
         self.attr_name = '({})'.format(tuple(f.attr_name for f in self.fields))
 
-    def in_(self, other):
-        return BinaryExpression(self, other, 'IN')
-
-    def not_in_(self, other):
-        return BinaryExpression(self, other, 'NOT IN')
-
     def get_sql_ast(self):
         return ['BRACKET'] + [f.get_sql_ast() for f in self.fields]
+
+
+def _get_json_type(i):
+    if isinstance(i, bool):
+        return 'boolean'
+    if isinstance(i, int):
+        return 'int'
+    if isinstance(i, float):
+        return 'double precision'
+    return 'text'
+
+
+class JSONField(Field):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(JSONLike, *args, **kwargs)
+        self._args = args
+        self._kwargs = kwargs
+        self._path = []
+        self._type = None
+
+    def _clone(self):
+        inst = self.__class__(*self._args, **self._kwargs)
+        inst._path = list(self._path)
+        inst._type = self._type
+        return inst
+
+    def __getitem__(self, item):
+        inst = self.clone()
+        inst._path.append(item)
+        return inst
+
+    def __eq__(self, other):
+        inst = self.clone()
+        inst._type = _get_json_type(other)
+        return BinaryExpression(inst, other, '=')
+
+    def __ne__(self, other):
+        inst = self.clone()
+        inst._type = _get_json_type(other)
+        operator = '!='
+        if other is None:
+            operator = 'IS NOT'
+        return self.BinaryExpression(inst, other, operator)
+
+    def __gt__(self, other):
+        inst = self.clone()
+        inst._type = _get_json_type(other)
+        return self.BinaryExpression(inst, other, '>')
+
+    def __ge__(self, other):
+        inst = self.clone()
+        inst._type = _get_json_type(other)
+        return self.BinaryExpression(inst, other, '>=')
+
+    def __lt__(self, other):
+        inst = self.clone()
+        inst._type = _get_json_type(other)
+        return self.BinaryExpression(inst, other, '<')
+
+    def __le__(self, other):
+        inst = self.clone()
+        inst._type = _get_json_type(other)
+        return self.BinaryExpression(inst, other, '<=')
+
+    def contains_(self, item):
+        return BinaryExpression(self, item, '?')
+
+    def not_contains_(self, item):
+        return UnaryExpression(BinaryExpression(self, item, '?'), 'NOT', suffix=False)
+
+    def __and__(self, other):
+        return BinaryExpression(self, other, '?&')
+
+    def __or__(self, other):
+        return BinaryExpression(self, other, '?|')
+
+    def get_sql_ast(self):
+        model = self.get_model()
+        table_name = None if not model else model._get_table_name()
+        sql_ast = [
+            'COLUMN',
+            table_name,
+            self.name,
+            self._path,
+            self._type,
+        ]
+        if self._alias_name:
+            sql_ast = ['ALIAS', sql_ast, self._alias_name]
+        return sql_ast
+
+    def __get__(self, obj, objtype):
+        v = super().__get__(obj, objtype)
+        if obj is not None:
+            v = TrackedValue.make(obj, self.attr_name, v)
+            obj._parsed_data[self.attr_name] = v
+        return v
 
 
 def _make_db_field_key(uuid, attr_name):

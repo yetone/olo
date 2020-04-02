@@ -3,6 +3,7 @@ from enum import Enum
 
 from olo.compat import Decimal, long, unicode
 from olo.sql_ast_translators.mysql_sql_ast_translator import MySQLSQLASTTranslator
+from olo.types.json import JSONLike
 from olo.utils import camel2underscore
 
 
@@ -70,6 +71,8 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
             f_type = camel2underscore(type_.__name__)
         elif type_ is bool:
             f_type = 'BOOLEAN'
+        elif type_ is JSONLike:
+            f_type = 'JSONB'
         else:
             f_type = 'TEXT'
 
@@ -115,3 +118,19 @@ class PostgresSQLSQLASTTranslator(MySQLSQLASTTranslator):
         if not pre_label:
             return f'ALTER TYPE {name} ADD VALUE %s', [label]
         return f'ALTER TYPE {name} ADD VALUE %s AFTER %s', [label, pre_label]
+
+    def post_COLUMN(self, table_name, field_name, path=None, type_=None):
+        sql, params = super().post_COLUMN(table_name, field_name)
+        if type_:
+            if type_ != 'text':
+                if path:
+                    sql = f'({sql} #>> %s)::{type_}'
+                else:
+                    sql = f'({sql})::{type_}'
+            elif path:
+                sql = f'({sql} #>> %s)'
+        elif path:
+            sql = f'({sql} #> %s)'
+        if path:
+            params.append(path)
+        return sql, params

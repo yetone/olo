@@ -19,6 +19,7 @@ from olo.compat import (
     PY2, Decimal, unicode, iteritems, str_types, get_items,
     izip,
 )
+from olo.types.json import JSONLike
 
 
 def camel2underscore(name):
@@ -81,6 +82,8 @@ keywords = {
 
 
 def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
+    if type_ is JSONLike:
+        return True
     if isinstance(type_, type) and isinstance(obj, type_):
         return True
     t = type(type_)
@@ -116,6 +119,8 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
 
 
 def transform_type(obj, type_):  # pylint: disable=too-many-return-statements
+    if type_ is JSONLike:
+        return obj
     if isinstance(type_, type) and isinstance(obj, type_):
         return obj
     if isinstance(type_, type) and issubclass(type_, Enum):

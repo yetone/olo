@@ -358,7 +358,11 @@ class BaseDataBase(object):
     def create_all(self):
         with self.transaction():
             for sql, params in self.gen_tables_schemas():
-                self.sql_execute(sql, params)
+                try:
+                    self.sql_execute(sql, params)
+                except Exception as e:
+                    logger.error('cannot execute sql: %s with %s: %s', sql, params, e)
+                    raise
 
     def register_model(self, model_cls):
         self._models.append(model_cls)

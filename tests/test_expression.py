@@ -164,7 +164,8 @@ class TestBinaryExpression(TestCase):
         self.assertEqual(ast, [
             'UNARY_OPERATE',
             ['COLUMN', 'dummy', 'age'],
-            'ASC'
+            'ASC',
+            True
         ])
         a = Dummy.age == 1
         exp = a.asc()
@@ -175,7 +176,8 @@ class TestBinaryExpression(TestCase):
              '=',
              ['COLUMN', 'dummy', 'age'],
              ['VALUE', 1]],
-            'ASC'
+            'ASC',
+            True
         ])
         f = UnionField(Dummy.age, Dummy.id)
         exp = f.not_in_([1])
