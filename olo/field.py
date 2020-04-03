@@ -215,6 +215,13 @@ class BaseField(object):
         )
 
 
+def process_enum_seq(v):
+    if isinstance(v, (list, tuple, set)):
+        t = type(v)
+        return t(i.name if isinstance(i, Enum) else i for i in v)
+    return v
+
+
 @attach_func_method
 class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
             SQLASTInterface):
@@ -224,6 +231,14 @@ class Field(BaseField, UnaryOperationMixin, BinaryOperationMixin,
 
     def __init__(self, *args, **kwargs):
         super(Field, self).__init__(*args, **kwargs)
+
+    def in_(self, other):
+        seq = process_enum_seq(other)
+        return super().in_(seq)
+
+    def not_in_(self, other):
+        seq = process_enum_seq(other)
+        return super().not_in_(seq)
 
     def alias(self, name):
         inst = self.clone()
