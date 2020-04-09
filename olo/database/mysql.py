@@ -116,7 +116,8 @@ class MySQLDataBase(BaseDataBase):
                  beansdb=None, autocommit=True,
                  report=lambda *args, **kwargs: None,
                  max_active_size=10,
-                 max_idle_size=5):
+                 max_idle_size=5,
+                 conn_timeout=60 * 60):
 
         super(MySQLDataBase, self).__init__(
             beansdb=beansdb,
@@ -130,6 +131,7 @@ class MySQLDataBase(BaseDataBase):
             conn_proxy_cls=MySQLConnProxy,
             max_active_size=max_active_size,
             max_idle_size=max_idle_size,
+            timeout=conn_timeout,
         )
 
     def get_conn(self):
