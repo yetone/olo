@@ -2,20 +2,10 @@ import logging
 import sys
 import time
 import threading
-from functools import wraps
 
-from olo.errors import ORMError
+from olo.libs.queue import Queue, Empty, Full
 from olo.logger import logger
 from olo.utils import log_call
-
-
-def lock(func):
-    @wraps(func)
-    def _(self, *args, **kwargs):
-        with self.lock:
-            return func(self, *args, **kwargs)
-
-    return _
 
 
 def log_pool(fmt):
@@ -32,10 +22,10 @@ def log_pool(fmt):
 
 
 class ConnProxy(object):
+    lock = threading.RLock()
     pid = 0
 
-    def __init__(self, conn, pool):
-        self.lock = threading.RLock()
+    def __init__(self, conn, pool: 'Pool'):
         with self.lock:
             if self.__class__.pid >= sys.maxsize:
                 self.__class__.pid = 0
@@ -43,8 +33,9 @@ class ConnProxy(object):
             self.id = self.__class__.pid
         self.conn = conn
         self.pool = pool
-        self.expire_time = time.time() + pool.timeout
+        self.expire_time = time.time() + pool._recycle
         self.is_closed = False
+        self.is_released = False
 
     def __getstate__(self):
         return self.__dict__
@@ -63,8 +54,10 @@ class ConnProxy(object):
     __repr__ = __str__
 
     def close(self):
-        self.is_closed = True
         self.release()
+
+    def do_real_close(self):
+        self.is_closed = True
         self.conn.close()
 
     @property
@@ -87,79 +80,105 @@ class ConnProxy(object):
 class Pool(object):
     def __init__(self,
                  creator,
-                 timeout=60 * 60,
-                 max_active_size=10,
-                 max_idle_size=5,
+                 size=5,
+                 max_overflow=10,
+                 timeout=30,
+                 recycle=60 * 60,
                  tick_time=0.01,
-                 wait_time=60 * 60,
                  conn_proxy_cls=ConnProxy,
+                 use_lifo=False,
                  enable_log=False):
-        self.creator = creator
-        self.timeout = timeout
-        self.max_active_size = max_active_size
-        self.max_idle_size = max_idle_size
-        self.active_conns = []
-        self.idle_conns = []
-        self.lock = threading.RLock()
-        self.tick_time = tick_time
-        self.wait_time = wait_time
-        self.conn_proxy_cls = conn_proxy_cls
-        self.enable_log = enable_log
+        self._creator = creator
+        self._pool = Queue(size, use_lifo=use_lifo)
+        self._overflow = 0 - size
+        self._max_overflow = max_overflow
+        self._timeout = timeout
+        self._recycle = recycle
+        self._overflow_lock = threading.RLock()
+        self._tick_time = tick_time
+        self._timeout = timeout
+        self._conn_proxy_cls = conn_proxy_cls
+        self._enable_log = enable_log
 
     def __str__(self):
         return (
-            '<Pool active_size={}, idle_size={}, max_active_size={},'
-            ' max_idle_size={}>'
+            '<Pool size={}, idle_size={}, overflow={}, max_overflow={}>'
         ).format(
-            self.active_size, self.idle_size, self.max_active_size,
-            self.max_idle_size)
+            self._pool.qsize(), self.idle_size, self._overflow, self._max_overflow)
 
     __repr__ = __str__
 
+    def _inc_overflow(self):
+        if self._max_overflow == -1:
+            self._overflow += 1
+            return True
+        with self._overflow_lock:
+            if self._overflow < self._max_overflow:
+                self._overflow += 1
+                return True
+            else:
+                return False
+
+    def _dec_overflow(self):
+        if self._max_overflow == -1:
+            self._overflow -= 1
+            return True
+        with self._overflow_lock:
+            self._overflow -= 1
+            return True
+
     @property
-    def active_size(self):
-        return len(self.active_conns)
+    def size(self):
+        return self._pool.maxsize
 
     @property
     def idle_size(self):
-        return len(self.idle_conns)
+        return self._pool.qsize()
 
     def _create_conn(self):
-        conn = self.creator()
-        return self.conn_proxy_cls(conn, self)
+        conn = self._creator()
+        return self._conn_proxy_cls(conn, self)
 
     @log_pool('acquire conn: {%ret}')
     def acquire_conn(self):
-        count = 0
         while True:
-            with self.lock:
-                if self.idle_conns:
-                    conn = self.idle_conns.pop(0)
-                    if not self.ping_conn(conn):
-                        if count > 10:
-                            raise ORMError('cannot get a alive connection!')
-                        # FIXME
-                        try:
-                            self.destroy_conn(conn)
-                        except Exception as e:
-                            logger.error('cannot destroy conn: %s', str(e))
-                        count += 1
-                        time.sleep(0.5)
-                        return self.acquire_conn()
-                    if conn.is_expired or conn.is_closed:
-                        self.destroy_conn(conn)
-                        return self.acquire_conn()
-                    self.active_conns.append(conn)
-                    return conn
-                if len(self.active_conns) == self.max_active_size:
-                    time.sleep(self.tick_time)
-                    _conn = self.active_conns[0]
-                    if time.time() - _conn.expire_time + self.timeout >= self.wait_time:  # noqa
-                        raise ORMError('wait to release connection too long!')
-                    continue
-                conn = self._create_conn()
-                self.active_conns.append(conn)
-                return conn
+            conn = self._do_acquire_conn()
+            if conn.is_expired or conn.is_closed or not self.ping_conn(conn):
+                try:
+                    self.destroy_conn(conn)
+                except Exception:
+                    pass
+                continue
+            conn.is_released = False
+            return conn
+
+    def _do_acquire_conn(self):
+        use_overflow = self._max_overflow > -1
+
+        try:
+            wait = use_overflow and self._overflow >= self._max_overflow
+            return self._pool.get(wait, self._timeout)
+        except Empty:
+            # don't do things inside of "except Empty", because when we say
+            # we timed out or can't connect and raise, Python 3 tells
+            # people the real error is queue.Empty which it isn't.
+            pass
+        if use_overflow and self._overflow >= self._max_overflow:
+            if not wait:
+                return self._do_acquire_conn()
+            else:
+                raise TimeoutError(
+                    'Pool limit of size {} overflow {} reached, '
+                    'connection timed out, timeout {}'.format(self.size, self._overflow, self._timeout),
+                    )
+
+        if self._inc_overflow():
+            try:
+                return self._create_conn()
+            except Exception:
+                self._dec_overflow()
+        else:
+            return self._do_acquire_conn()
 
     def ping_conn(self, conn):
         try:
@@ -170,32 +189,31 @@ class Pool(object):
         except Exception:
             return False
 
-    @lock
     def clear_conns(self):
-        while self.idle_conns:
-            conn = self.idle_conns.pop()
-            conn.close()
-        while self.active_conns:
-            conn = self.active_conns.pop()
-            conn.close()
+        while True:
+            try:
+                conn = self._pool.get(False)
+                conn.do_real_close()
+            except Empty:
+                break
 
-    @lock
+        self._overflow = 0 - self.size
+
     @log_pool('destroy conn: {conn}')
     def destroy_conn(self, conn):
-        if conn in self.active_conns:
-            self.active_conns.remove(conn)
-        if conn in self.idle_conns:
-            self.idle_conns.remove(conn)  # pragma: no cover
-        if not conn.is_closed:
-            conn.close()
+        try:
+            if not conn.is_closed:
+                conn.do_real_close()
+        finally:
+            self._dec_overflow()
 
-    @lock
     @log_pool('release conn: {conn}')
-    def release_conn(self, conn):
-        if len(self.idle_conns) == self.max_idle_size or conn.is_closed or conn.is_expired:
-            self.destroy_conn(conn)
+    def release_conn(self, conn: 'ConnProxy'):
+        if conn.is_released:
+            logger.warn('%s attempted to double release!', conn)
             return
-        if not conn.is_closed and conn not in self.idle_conns:
-            self.idle_conns.append(conn)
-        if conn in self.active_conns:
-            self.active_conns.remove(conn)
+        try:
+            self._pool.put(conn, False)
+            conn.is_released = True
+        except Full:
+            self.destroy_conn(conn)
