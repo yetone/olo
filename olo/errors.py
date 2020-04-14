@@ -2,6 +2,10 @@ class ORMError(Exception):
     pass
 
 
+class TimeoutError(ORMError):
+    pass
+
+
 class ExpressionError(ORMError):
     pass
 

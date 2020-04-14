@@ -115,9 +115,10 @@ class MySQLDataBase(BaseDataBase):
                  charset='utf8mb4',
                  beansdb=None, autocommit=True,
                  report=lambda *args, **kwargs: None,
-                 max_active_size=10,
-                 max_idle_size=5,
-                 conn_timeout=60 * 60):
+                 pool_size=5,
+                 pool_timeout=30,
+                 pool_recycle=60*60,
+                 pool_max_overflow=10):
 
         super(MySQLDataBase, self).__init__(
             beansdb=beansdb,
@@ -129,9 +130,10 @@ class MySQLDataBase(BaseDataBase):
                 host, port, user, password, dbname, charset
             ),
             conn_proxy_cls=MySQLConnProxy,
-            max_active_size=max_active_size,
-            max_idle_size=max_idle_size,
-            timeout=conn_timeout,
+            size=pool_size,
+            timeout=pool_timeout,
+            recycle=pool_recycle,
+            max_overflow=pool_max_overflow,
         )
 
     def get_conn(self):
