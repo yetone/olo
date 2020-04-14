@@ -16,7 +16,7 @@ def log_pool(fmt):
         level=logging.DEBUG,
         toggle=(
             lambda *args, **kwargs:
-            len(args) > 0 and getattr(args[0], 'enable_log', False)
+            len(args) > 0 and getattr(args[0], '_enable_log', False)
         )
     )
 
