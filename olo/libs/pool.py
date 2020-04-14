@@ -104,7 +104,7 @@ class Pool(object):
         return (
             '<Pool size={}, idle_size={}, overflow={}, max_overflow={}>'
         ).format(
-            self._pool.qsize(), self.idle_size, self._overflow, self._max_overflow)
+            self.size, self.idle_size, self._overflow, self._max_overflow)
 
     __repr__ = __str__
 
