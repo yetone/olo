@@ -2,6 +2,7 @@ import logging
 import sys
 import time
 import threading
+from datetime import datetime
 
 from olo.libs.queue import Queue, Empty, Full
 from olo.logger import logger
@@ -36,6 +37,7 @@ class ConnProxy(object):
         self.expire_time = time.time() + pool._recycle
         self.is_closed = False
         self.is_released = False
+        self.created_at = datetime.now()
 
     def __getstate__(self):
         return self.__dict__
@@ -47,8 +49,8 @@ class ConnProxy(object):
         return getattr(self.conn, item)
 
     def __str__(self):
-        return '<ConnProxy id={}, conn={}, pool={}>'.format(
-            self.id, self.conn, self.pool
+        return '<ConnProxy id={}, created_at={}, conn={}, pool={}>'.format(
+            self.id, self.created_at.strftime('%Y-%m-%d %H:%M:%S'), self.conn, self.pool
         )
 
     __repr__ = __str__

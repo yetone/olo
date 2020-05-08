@@ -60,6 +60,7 @@ class OLOCursor(object):
     def __init__(self, cur, db):
         self.cur = cur
         self.db = db
+        self.created_at = datetime.now()
 
         assert self.db.in_transaction(), 'create cursor must in transaction!'
         self.db.get_last_transaction().add_cur(self)
@@ -79,7 +80,7 @@ class OLOCursor(object):
         return iter(self.cur)
 
     def __str__(self):
-        return '<OLOCursor: {}>'.format(self.cur)  # pragma: no cover
+        return '<OLOCursor: conn={}, created_at={}, cur={}>'.format(getattr(self, 'conn', None), self.created_at.strftime('%Y-%m-%d %H:%M:%S'), self.cur)  # noqa pragma: no cover
 
     __repr__ = __str__
 
