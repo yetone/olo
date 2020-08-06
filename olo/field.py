@@ -417,10 +417,11 @@ def _prefetch_db_data(obj):
     if not db_values:
         return
     for (entity, field, version), db_value in izip(pairs, db_values):
+        data = DbField._get_data(entity)
         if db_value is missing:
+            data[field.attr_name] = None
             continue
         value = _get_value_from_db_value(db_value, version, field)
-        data = DbField._get_data(entity)
         data[field.attr_name] = _process_value(value, field)
 
 
