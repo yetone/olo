@@ -129,6 +129,16 @@ class Foo(BaseModel):
     key = Field(str, noneable=True, default=lambda: str(uuid4()), length=255)
     prop1 = DbField(list, noneable=True)
     boolean = Field(bool, default=False)
+    test_getter = Field(int, default=0)
+    test_setter = Field(int, default=0)
+
+    @test_getter.getter
+    def test_getter(self, value):
+        return value + 1
+
+    @test_setter.setter
+    def test_setter(self, value):
+        return value - 1
 
     __unique_keys__ = (
         (name, 'age'),

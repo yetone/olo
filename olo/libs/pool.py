@@ -145,6 +145,8 @@ class Pool(object):
     def acquire_conn(self):
         while True:
             conn = self._do_acquire_conn()
+            if conn is None:
+                raise Exception(f'cannot connect to the database!!!')
             if conn.is_expired or conn.is_closed or not self.ping_conn(conn):
                 try:
                     self.destroy_conn(conn)
