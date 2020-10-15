@@ -22,7 +22,7 @@ from olo.events import after_delete, after_insert, after_update, before_update
 from olo.expression import Expression
 from olo.ext.exported import IS_EXPORTED_PROPERTY
 from olo.ext.n import N
-from olo.field import BaseField, DbField, Field, UnionField
+from olo.field import BaseField, DbField, Field, UnionField, BatchField
 from olo.funcs import RAND
 from olo.key import StrKey
 from olo.query import Query
@@ -309,7 +309,9 @@ def _collect_fields(cls, attrs) -> Tuple[
             _name = PATTERN_N_NAME.sub('', name)
             if name == _name or _name in cls.__dict__:
                 continue  # pragma: no cover
-            setattr(cls, _name, _create_n_property(v, _name))
+            f = BatchField(object, default=v.default, name=_name)
+            f.getter(v.func)
+            setattr(cls, _name, f)
 
     ordered_field_attr_names = [
         f.attr_name for f in sorted(field_objs, key=lambda f: f.id)

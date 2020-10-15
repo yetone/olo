@@ -1,9 +1,11 @@
-from olo.field import ConstField, UnionField
+from typing import Optional
+
+from olo.field import ConstField, UnionField, BatchField
 from olo.errors import ValidationError, DbFieldVersionError
 from olo.compat import xrange
 
-from .base import TestCase, Dummy, Foo, Gender
-from .utils import patched_db_get, patched_db_get_multi
+from .base import TestCase, Dummy, Foo, Gender, Foo as _Foo, Bar
+from .utils import patched_db_get, patched_db_get_multi, patched_execute
 
 
 class TestField(TestCase):
@@ -394,3 +396,66 @@ class TestDbField(TestCase):
 
                 self.assertEqual(db_get.call_count, 0)
                 self.assertEqual(db_get_multi.call_count, 4)
+
+
+class TestBatchField(TestCase):
+
+    def test_batch_field(self):
+        class Foo(_Foo):
+
+            a_bar = BatchField(Bar)
+            b_bar = BatchField(Bar)
+
+            @a_bar.getter
+            @classmethod
+            def get_a_bars(cls, foos):
+                bars = Bar.gets([str(f.id) for f in foos])
+                return bars
+
+            @b_bar.getter
+            @classmethod
+            def b_bars(cls, foos):
+                bars = Bar.gets([str(f.id) for f in foos])
+                return {
+                    int(b.name): b
+                    for b in bars
+                }
+
+        Foo.create(age=1)
+        Foo.create(age=2)
+        Foo.create(age=3)
+        Foo.create(age=4)
+        Foo.create(age=5)
+        Foo.create(age=6)
+        Bar.create(name=1)
+        Bar.create(name=2)
+        Bar.create(name=3)
+
+        def a_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                b = f.a_bar
+
+                if f.id > 3:
+                    self.assertIsNone(b)
+                else:
+                    self.assertIsInstance(b, Bar)
+                    self.assertEqual(str(f.id), b.name)
+
+        def b_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                b = f.b_bar
+                if f.id > 3:
+                    self.assertIsNone(b)
+                else:
+                    self.assertIsInstance(b, Bar)
+                    self.assertEqual(str(f.id), b.name)
+
+        with patched_execute as exe:
+            a_func()
+            self.assertEqual(exe.call_count, 2)
+
+        with patched_execute as exe:
+            b_func()
+            self.assertEqual(exe.call_count, 2)
