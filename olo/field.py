@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from copy import copy
 from enum import Enum
+from inspect import isfunction
 from typing import TYPE_CHECKING, Optional, Callable
 
 from olo.orm_types import TrackedValue
@@ -605,10 +606,83 @@ class DbField(BaseField):
         elif version == 1:
             self._delete_v1(obj)
         elif isinstance(version, MigrationVersion):
-            v = getattr(self, '_delete_v{}'.format(version.to_version))(obj)  # noqa
-            v = getattr(self, '_delete_v{}'.format(version.from_version))(obj)  # noqa
+            getattr(self, '_delete_v{}'.format(version.to_version))(obj)  # noqa
+            getattr(self, '_delete_v{}'.format(version.from_version))(obj)  # noqa
         data = self._get_data(obj)
         parsed_data = self._get_parsed_data(obj)
         data.pop(attr_name, None)
         parsed_data.pop(attr_name, None)
         obj.after_update()
+
+
+class BatchField(BaseField):
+    def __init__(self, type_, default=None, name=None):
+        if isfunction(type_):
+            type_ = object
+        super(BatchField, self).__init__(type_, default=default, name=name, noneable=True)
+
+    def getter(self, func_or_classmethod):
+        if isinstance(func_or_classmethod, classmethod):
+            func = func_or_classmethod.__func__
+        else:
+            func = func_or_classmethod
+        super(BatchField, self).getter(func)
+        return func_or_classmethod
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+
+        data = self._get_data(instance)
+        v = data.get(self.name, missing)
+        if v is not missing:
+            return v
+
+        v = self._get(instance, owner)
+        data[self.name] = v
+        return v
+
+    def _get(self, instance, owner):
+        if self._getter is None:
+            raise AttributeError('batch field `{}.{}` has no getter!', owner.__name__, self.name)
+
+        session = instance._olo_qs
+        if session is None:
+            entities = [instance]  # pragma: no cover
+        else:
+            entities = session.entities
+
+        name = self.name
+        default = self.get_default()
+        res = self._getter(owner, entities)
+
+        entity_mapping = {
+            e._get_singleness_pk_value(): e
+            for e in entities
+        }
+
+        if isinstance(res, dict):
+
+            for pv, item in iteritems(entity_mapping):
+                if hasattr(item, '_olo_qs'):
+                    setattr(item, name, res.get(pv, default))
+
+            return res.get(instance._get_singleness_pk_value(), default)
+
+        if isinstance(res, list):
+
+            for idx, item in enumerate(entities):
+                if hasattr(item, '_olo_qs'):
+                    try:
+                        v = res[idx]
+                    except IndexError:
+                        v = default
+
+                    setattr(item, name, v)
+
+            try:
+                return res[instance._olo_qs_idx]
+            except IndexError:  # pragma: no cover
+                return default  # pragma: no cover
+
+        return default  # pragma: no cover

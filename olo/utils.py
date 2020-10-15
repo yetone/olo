@@ -5,6 +5,7 @@ import json
 import re
 import threading
 from enum import Enum
+from typeguard import check_type
 
 import dateparser
 import logging
@@ -86,6 +87,13 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
         return True
     if isinstance(type_, type) and isinstance(obj, type_):
         return True
+    try:
+        from typing import List
+        if isinstance(type_, List.__class__):
+            check_type('', obj, type_)
+            return True
+    except (TypeError, ImportError):
+        pass
     t = type(type_)
     if t != type(obj):
         return False

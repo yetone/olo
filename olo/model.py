@@ -22,12 +22,12 @@ from olo.events import after_delete, after_insert, after_update, before_update
 from olo.expression import Expression
 from olo.ext.exported import IS_EXPORTED_PROPERTY
 from olo.ext.n import N
-from olo.field import BaseField, DbField, Field, UnionField
+from olo.field import BaseField, DbField, Field, UnionField, BatchField
 from olo.funcs import RAND
 from olo.key import StrKey
 from olo.query import Query
 from olo.statement import Assignment
-from olo.utils import (cached_property, camel2underscore, deprecation,
+from olo.utils import (camel2underscore, deprecation,
                        friendly_repr, missing, override,
                        readonly_cached_property, type_checker)
 
@@ -210,53 +210,7 @@ def init_field(field, cls, attr_name):
     field.AES_KEY = getattr(cls, 'AES_KEY', '')
 
 
-def _create_n_property(method, name):
-    default = method.default
-
-    def f(self):
-        session = self._olo_qs
-        if session is None:
-            entities = [self]  # pragma: no cover
-        else:
-            entities = session.entities
-
-        res = method(entities)
-
-        entity_mapping = {
-            e._get_singleness_pk_value(): e
-            for e in entities
-        }
-
-        if isinstance(res, dict):
-
-            for pv, item in iteritems(entity_mapping):
-                if hasattr(item, '_olo_qs'):
-                    setattr(item, name, res.get(pv, default))
-
-            return res.get(self._get_singleness_pk_value(), default)
-
-        if isinstance(res, list):
-
-            for idx, item in enumerate(entities):
-                if hasattr(item, '_olo_qs'):
-                    try:
-                        v = res[idx]
-                    except IndexError:
-                        v = default
-
-                    setattr(item, name, v)
-
-            try:
-                return res[self._olo_qs_idx]
-            except IndexError:  # pragma: no cover
-                return default  # pragma: no cover
-
-        return default  # pragma: no cover
-
-    f.__name__ = name
-    return cached_property(f)
-
-
+# pylint: disable=too-many-statements
 def _collect_fields(cls, attrs) -> Tuple[
     Set[str], Set[str], Set[Union[BaseField, Any]], Dict[str, Any], Set[str], Dict[str, Callable], Set[str], list, Dict[
         Any, str], Dict[str, BaseField], Dict[str, BaseField]]:
@@ -309,7 +263,9 @@ def _collect_fields(cls, attrs) -> Tuple[
             _name = PATTERN_N_NAME.sub('', name)
             if name == _name or _name in cls.__dict__:
                 continue  # pragma: no cover
-            setattr(cls, _name, _create_n_property(v, _name))
+            f = BatchField(object, default=v.default, name=_name)
+            f.getter(v.func)
+            setattr(cls, _name, f)
 
     ordered_field_attr_names = [
         f.attr_name for f in sorted(field_objs, key=lambda f: f.id)

@@ -1,9 +1,11 @@
-from olo.field import ConstField, UnionField
+from typing import Optional, List
+
+from olo.field import ConstField, UnionField, BatchField
 from olo.errors import ValidationError, DbFieldVersionError
 from olo.compat import xrange
 
-from .base import TestCase, Dummy, Foo, Gender
-from .utils import patched_db_get, patched_db_get_multi
+from .base import TestCase, Dummy, Foo, Gender, Foo as _Foo, Bar
+from .utils import patched_db_get, patched_db_get_multi, patched_execute
 
 
 class TestField(TestCase):
@@ -394,3 +396,104 @@ class TestDbField(TestCase):
 
                 self.assertEqual(db_get.call_count, 0)
                 self.assertEqual(db_get_multi.call_count, 4)
+
+
+class TestBatchField(TestCase):
+
+    def test_batch_field(self):
+        class Foo(_Foo):
+
+            a_bar = BatchField(Bar)
+            b_bar = BatchField(Bar)
+            c_bars = BatchField(List[Bar])
+            d_foo = BatchField(lambda: Foo)
+
+            @a_bar.getter
+            @classmethod
+            def get_a_bars(cls, foos):
+                bars = Bar.gets([str(f.id) for f in foos])
+                return bars
+
+            @b_bar.getter
+            @classmethod
+            def get_b_bars(cls, foos):
+                bars = Bar.gets([str(f.id) for f in foos])
+                return {
+                    int(b.name): b
+                    for b in bars
+                }
+
+            @c_bars.getter
+            @classmethod
+            def get_c_bars_list(cls, foos):
+                bars = Bar.gets([str(f.id) for f in foos])
+                return [[b] for b in bars]
+
+            @d_foo.getter
+            @classmethod
+            def get_d_foos(cls, foos):
+                return foos
+
+        Foo.create(age=1)
+        Foo.create(age=2)
+        Foo.create(age=3)
+        Foo.create(age=4)
+        Foo.create(age=5)
+        Foo.create(age=6)
+        Bar.create(name=1)
+        Bar.create(name=2)
+        Bar.create(name=3)
+
+        def a_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                b = f.a_bar
+
+                if f.id > 3:
+                    self.assertIsNone(b)
+                else:
+                    self.assertIsInstance(b, Bar)
+                    self.assertEqual(str(f.id), b.name)
+
+        def b_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                b = f.b_bar
+                if f.id > 3:
+                    self.assertIsNone(b)
+                else:
+                    self.assertIsInstance(b, Bar)
+                    self.assertEqual(str(f.id), b.name)
+
+        def c_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                bs = f.c_bars
+                if f.id > 3:
+                    self.assertIsNone(bs)
+                else:
+                    self.assertIsInstance(bs, List)
+                    self.assertEqual(str(f.id), bs[0].name)
+
+        def d_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                f_ = f.d_foo
+                self.assertIsInstance(f_, Foo)
+                self.assertEqual(f.id, f_.id)
+
+        with patched_execute as exe:
+            a_func()
+            self.assertEqual(exe.call_count, 2)
+
+        with patched_execute as exe:
+            b_func()
+            self.assertEqual(exe.call_count, 2)
+
+        with patched_execute as exe:
+            c_func()
+            self.assertEqual(exe.call_count, 2)
+
+        with patched_execute as exe:
+            d_func()
+            self.assertEqual(exe.call_count, 1)

@@ -7,3 +7,4 @@ decorator==4.2.1
 pymysql==0.9.1
 psycopg2==2.8.4
 typing-extensions==3.7.4.1
+typeguard==2.9.1
