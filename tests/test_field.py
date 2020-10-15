@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from olo.field import ConstField, UnionField, BatchField
 from olo.errors import ValidationError, DbFieldVersionError
@@ -405,6 +405,8 @@ class TestBatchField(TestCase):
 
             a_bar = BatchField(Bar)
             b_bar = BatchField(Bar)
+            c_bars = BatchField(List[Bar])
+            d_foo = BatchField(lambda: Foo)
 
             @a_bar.getter
             @classmethod
@@ -414,12 +416,23 @@ class TestBatchField(TestCase):
 
             @b_bar.getter
             @classmethod
-            def b_bars(cls, foos):
+            def get_b_bars(cls, foos):
                 bars = Bar.gets([str(f.id) for f in foos])
                 return {
                     int(b.name): b
                     for b in bars
                 }
+
+            @c_bars.getter
+            @classmethod
+            def get_c_bars_list(cls, foos):
+                bars = Bar.gets([str(f.id) for f in foos])
+                return [[b] for b in bars]
+
+            @d_foo.getter
+            @classmethod
+            def get_d_foos(cls, foos):
+                return foos
 
         Foo.create(age=1)
         Foo.create(age=2)
@@ -452,6 +465,23 @@ class TestBatchField(TestCase):
                     self.assertIsInstance(b, Bar)
                     self.assertEqual(str(f.id), b.name)
 
+        def c_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                bs = f.c_bars
+                if f.id > 3:
+                    self.assertIsNone(bs)
+                else:
+                    self.assertIsInstance(bs, List)
+                    self.assertEqual(str(f.id), bs[0].name)
+
+        def d_func():
+            fs = Foo.gets_by()
+            for f in fs:
+                f_ = f.d_foo
+                self.assertIsInstance(f_, Foo)
+                self.assertEqual(f.id, f_.id)
+
         with patched_execute as exe:
             a_func()
             self.assertEqual(exe.call_count, 2)
@@ -459,3 +489,11 @@ class TestBatchField(TestCase):
         with patched_execute as exe:
             b_func()
             self.assertEqual(exe.call_count, 2)
+
+        with patched_execute as exe:
+            c_func()
+            self.assertEqual(exe.call_count, 2)
+
+        with patched_execute as exe:
+            d_func()
+            self.assertEqual(exe.call_count, 1)

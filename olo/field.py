@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from copy import copy
 from enum import Enum
+from inspect import isfunction
 from typing import TYPE_CHECKING, Optional, Callable
 
 from olo.orm_types import TrackedValue
@@ -616,6 +617,8 @@ class DbField(BaseField):
 
 class BatchField(BaseField):
     def __init__(self, type_, default=None, name=None):
+        if isfunction(type_):
+            type_ = object
         super(BatchField, self).__init__(type_, default=default, name=name, noneable=True)
 
     def getter(self, func_or_classmethod):
