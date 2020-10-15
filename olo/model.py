@@ -210,10 +210,10 @@ def init_field(field, cls, attr_name):
     field.AES_KEY = getattr(cls, 'AES_KEY', '')
 
 
-# pylint: disable=too-many-statements
 def _collect_fields(cls, attrs) -> Tuple[
     Set[str], Set[str], Set[Union[BaseField, Any]], Dict[str, Any], Set[str], Dict[str, Callable], Set[str], list, Dict[
         Any, str], Dict[str, BaseField], Dict[str, BaseField]]:
+    # pylint: disable=too-many-statements
     fields = set()
     db_fields = set()
     primary_key = set()
