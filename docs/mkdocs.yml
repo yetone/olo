@@ -2,7 +2,7 @@ site_name: OLO
 site_description: ORM based on the sqlstore.
 site_author: Guan Xipeng
 repo_name: subject/olo
-repo_url: https://github.com/douban/olo
+repo_url: https://github.com/yetone/olo
 pages:
   - 目录: index.md
   - 前言: foreword.md
