@@ -5,8 +5,8 @@
 # 
 
 <p align="center">
-    <a href="https://travis-ci.org/yetone/olo">
-        <img alt="Build Status" src="https://travis-ci.org/yetone/olo.svg?branch=master">
+    <a href="https://github.com/yetone/olo/actions/workflows/test.yml">
+        <img alt="Build Status" src="https://github.com/yetone/olo/actions/workflows/test.yml/badge.svg">
     </a>
     <a href="https://codecov.io/gh/yetone/olo">
         <img alt="Coverage Status" src="https://codecov.io/gh/yetone/olo/branch/master/graph/badge.svg" />
