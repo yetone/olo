@@ -32,11 +32,11 @@ MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
 MYSQL_DB = 'test_olo'
 MYSQL_CHARSET = 'utf8mb4'
 
-PGSQL_HOST = 'localhost'
+PGSQL_HOST = os.getenv('PGSQL_HOST', 'localhost')
 PGSQL_PORT = 5432
 PGSQL_USER = os.getenv('PGSQL_USER', 'root')
 PGSQL_PASSWORD = os.getenv('PGSQL_PASSWORD', '')
-PGSQL_DB = 'test_olo'
+PGSQL_DB = os.getenv('PGSQL_DB', 'test_olo')
 
 
 created_tables = False
