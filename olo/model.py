@@ -560,13 +560,14 @@ class Model(with_metaclass(ModelMeta)):
                 if k not in self.__db_fields__
             }
         # Return tuple to distinguish the old version
-        return (dct,)
+        return dct
 
     def __setstate__(self, state):
-        if isinstance(state, tuple):
-            self.__dict__.update(state[0])
-        else:
-            self._data = state  # pragma: no cover
+        self.__dict__.update(state)
+        self._init()
+
+    def __olo_setstate__(self, state):
+        self._data = state  # pragma: no cover
         self._init()
 
     @classmethod
@@ -674,7 +675,7 @@ class Model(with_metaclass(ModelMeta)):
             getattr(self._orig, k, None)
 
         next_inst = self._clone()
-        next_inst.__setstate__(dict(self._data, **clean_attrs))
+        next_inst.__olo_setstate__(dict(self._data, **clean_attrs))
         can_update = self._orig._will_update(
             next_inst,
             fields=clean_attrs.keys(),
