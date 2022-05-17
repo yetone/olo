@@ -37,8 +37,8 @@ for line in open('requirements.txt', 'r'):
 
 setup(
     name='olo',
-    version='0.4.0',
-    keywords=('ORM', 'olo', 'cache', 'sqlstore'),
+    version='0.5.0',
+    keywords=['ORM', 'olo', 'cache', 'sqlstore'],
     description='ORM with intelligent and elegant cache manager',
     url='https://github.com/yetone/olo',
     license='MIT License',
@@ -49,7 +49,7 @@ setup(
     install_requires=install_requires,
     platforms='any',
     tests_require=(
-        'pytest',
+        'pytest==7.1.2',
     ),
     **setup_kwargs
 )
