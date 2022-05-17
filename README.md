@@ -20,7 +20,7 @@
         <img alt="PyPI Wheel" src="https://img.shields.io/pypi/wheel/olo.svg" />
     </a>
     <a href="https://www.python.org">
-        <img alt="Support Python Version" src="https://img.shields.io/badge/Python-3.8-brightgreen.svg">
+        <img alt="Support Python Version" src="https://img.shields.io/badge/Python-3.10-brightgreen.svg">
     </a>
 </p>
 
