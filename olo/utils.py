@@ -88,8 +88,8 @@ def type_checker(type_, obj):  # pylint: disable=too-many-return-statements
     if isinstance(type_, type) and isinstance(obj, type_):
         return True
     try:
-        from typing import List
-        if isinstance(type_, List.__class__):
+        from typing import _GenericAlias
+        if isinstance(type_, _GenericAlias):
             check_type('', obj, type_)
             return True
     except (TypeError, ImportError):

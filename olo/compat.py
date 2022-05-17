@@ -9,6 +9,8 @@ except ImportError:
 import sys
 
 PY2 = sys.version_info[0] == 2
+PY39 = sys.version_info[:2] >= (3, 9)
+PY310 = sys.version_info[:2] >= (3, 10)
 
 if PY2:
     from future_builtins import zip as izip, map as imap

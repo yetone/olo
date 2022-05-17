@@ -6,12 +6,12 @@
 # and is released under the Apache 2.0 license: https://www.apache.org/licenses/LICENSE-2.0
 
 from __future__ import absolute_import, print_function, division
-from olo.compat import PY2, izip, xrange
+from olo.compat import PY2, PY310, izip, xrange
 
 import sys
 import types
 from opcode import opname as opnames, HAVE_ARGUMENT, EXTENDED_ARG, cmp_op
-from opcode import hasconst, hasname, hasjrel, haslocal, hascompare, hasfree
+from opcode import hasconst, hasname, hasjrel, haslocal, hascompare, hasfree, hasjabs
 
 from olo.libs.cache import LocalCache
 from olo.libs.compiler import ast
@@ -143,13 +143,15 @@ class Decompiler(object):
                     elif op in hasname:
                         arg = [code.co_names[oparg]]
                     elif op in hasjrel:
-                        arg = [i + oparg]
+                        arg = [i + oparg * (2 if PY310 else 1)]
                     elif op in haslocal:
                         arg = [code.co_varnames[oparg]]
                     elif op in hascompare:
                         arg = [cmp_op[oparg]]
                     elif op in hasfree:
                         arg = [free[oparg]]
+                    elif op in hasjabs:
+                        arg = [oparg * (2 if PY310 else 1)]
                     else:
                         arg = [oparg]
                 else:
@@ -201,9 +203,9 @@ class Decompiler(object):
     BINARY_SUBTRACT     = binop(ast.Sub)  # noqa
     BINARY_LSHIFT       = binop(ast.LeftShift)  # noqa
     BINARY_RSHIFT       = binop(ast.RightShift)  # noqa
-    BINARY_AND          = binop(ast.Bitand, list)  # noqa
-    BINARY_XOR          = binop(ast.Bitxor, list)  # noqa
-    BINARY_OR           = binop(ast.Bitor, list)  # noqa
+    BINARY_AND          = binop(ast.Bitand)  # noqa
+    BINARY_XOR          = binop(ast.Bitxor)  # noqa
+    BINARY_OR           = binop(ast.Bitor)  # noqa
     BINARY_TRUE_DIVIDE  = BINARY_DIVIDE  # noqa
     BINARY_MODULO       = binop(ast.Mod)  # noqa
 
@@ -571,6 +573,12 @@ class Decompiler(object):
         ass_tuple = ast.AssTuple([])
         ass_tuple.count = count
         return ass_tuple
+
+    def GEN_START(decompiler, kind):
+        pass
+
+    def CONTAINS_OP(decompiler, invert):
+        return decompiler.COMPARE_OP('not in' if invert else 'in')
 
     def YIELD_VALUE(decompiler):
         expr = decompiler.stack.pop()
