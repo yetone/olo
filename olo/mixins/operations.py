@@ -2,16 +2,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
-    from olo.expression import UnaryExpression, BinaryExpression
+    from olo.expression import UnaryExpression as UnaryExpressionT, BinaryExpression
 
 
 class UnaryOperationMixin(object):
-    UnaryExpression: Type[UnaryExpression]
+    UnaryExpression: Type[UnaryExpressionT]
 
-    def desc(self) -> UnaryExpression:
+    def desc(self) -> UnaryExpressionT:
         return self.UnaryExpression(self, 'DESC')
 
-    def asc(self) -> UnaryExpression:
+    def asc(self) -> UnaryExpressionT:
         return self.UnaryExpression(self, 'ASC')
 
 
