@@ -1,6 +1,6 @@
 # FieldType
 
-由于 [Field][field] 是「静态」的，所以这里单独说明一下其类型注释
+由于 [Field][field] 的类型是「静态」的，所以这里单独说明一下其类型注释
 
 > 不要吐槽我这样搞类型标注！！！因为我写 OLO 的年代还是 Python 2.X 盛行的年代，那时候 Python 3.x 的 type annotation 还是一个触不可及的传说！请珍惜每一个跟随着 Python 从 2.x 一路走来的劳动人民！
 
