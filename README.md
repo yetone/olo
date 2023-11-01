@@ -29,6 +29,10 @@
 </p>
 
 <p align="center">
+    If you like static type checking for Python, you can referring to <a href="https://github.com/yetone/olo-stubs">Mypy plugin and stubs for OLO</a>
+</p>
+
+<p align="center">
     <a href="https://yetone.github.io/olo/">查看文档 📖</a>
 </p>
 
