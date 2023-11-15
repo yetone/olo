@@ -6,7 +6,7 @@
 # and is released under the Apache 2.0 license: https://www.apache.org/licenses/LICENSE-2.0
 
 from __future__ import absolute_import, print_function, division
-from olo.compat import PY2, PY310, izip, xrange
+from olo.compat import PY2, PY310, PY311, izip, xrange
 
 import sys
 import types
@@ -137,18 +137,30 @@ class Decompiler(object):
                                 oparg * 65536
                             )
                             i += 2
+
+                opname = opnames[op].replace('+', '_')
                 if op >= HAVE_ARGUMENT:
                     if op in hasconst:
                         arg = [code.co_consts[oparg]]
                     elif op in hasname:
-                        arg = [code.co_names[oparg]]
+                        if opname == 'LOAD_GLOBAL':
+                            push_null = False
+                            if PY311:
+                                push_null = oparg & 1
+                                oparg >>= 1
+                            arg = [code.co_names[oparg], push_null]
+                        else:
+                            arg = [code.co_names[oparg]]
                     elif op in hasjrel:
-                        arg = [i + oparg * (2 if PY310 else 1)]
+                        arg = [i + oparg * (2 if PY310 else 1)
+                               * (-1 if 'BACKWARD' in opname else 1)]
                     elif op in haslocal:
                         arg = [code.co_varnames[oparg]]
                     elif op in hascompare:
                         arg = [cmp_op[oparg]]
                     elif op in hasfree:
+                        if PY311:
+                            oparg -= len(code.co_varnames)
                         arg = [free[oparg]]
                     elif op in hasjabs:
                         arg = [oparg * (2 if PY310 else 1)]
@@ -317,10 +329,37 @@ class Decompiler(object):
         method = pop()
         return ast.CallFunc(method, args)
 
+    def CACHE(decompiler):
+        pass
+
+    def CALL(decompiler, argc):
+        values = decompiler.pop_items(argc)
+
+        keys = decompiler.kw_names
+        decompiler.kw_names = None
+
+        args = values
+        keywords = []
+        if keys:
+            args = values[:-len(keys)]
+            keywords = [ast.keyword(k, v) for k, v in zip(keys, values[-len(keys):])]
+
+        self = decompiler.stack.pop()
+        callable_ = decompiler.stack.pop()
+        if callable_ is None:
+            callable_ = self
+        else:
+            args.insert(0, self)
+        decompiler.stack.append(callable_)
+        return decompiler._call_function(args, keywords)
+
     def COMPARE_OP(decompiler, op):
         oper2 = decompiler.stack.pop()
         oper1 = decompiler.stack.pop()
         return ast.Compare(oper1, [(op, oper2)])
+
+    def COPY_FREE_VARS(decompiler, n):
+        pass
 
     def DUP_TOP(decompiler):
         return decompiler.stack[-1]
@@ -405,9 +444,37 @@ class Decompiler(object):
             decompiler.targets[endpos] = if_exp
         return if_exp
 
-    def LIST_APPEND(decompiler, offset=None):
-        throw(InvalidQuery, 'Use generator expression (... for ... in ...) '
-              'instead of list comprehension [... for ... in ...] inside query')  # noqa
+
+    def LIST_APPEND(decompiler, offset):
+        tos = decompiler.stack.pop()
+        list_node = decompiler.stack[-offset]
+        if isinstance(list_node, ast.comprehension):
+            throw(InvalidQuery('Use generator expression (... for ... in ...) '
+                               'instead of list comprehension [... for ... in ...] inside query'))
+
+        assert isinstance(list_node, ast.List), list_node
+        list_node.elts.append(tos)
+
+    def LIST_EXTEND(decompiler, offset):
+        if offset != 1:
+            raise NotImplementedError(offset)
+        items = decompiler.stack.pop()
+        if not isinstance(items, ast.Constant):
+            raise NotImplementedError(type(items))
+        if not isinstance(items.value, tuple):
+            raise NotImplementedError(type(items.value))
+        lst = decompiler.stack.pop()
+        if not isinstance(lst, ast.List):
+            raise NotImplementedError(type(lst))
+        values = [make_const(v) for v in items.value]
+        lst.elts.extend(values)
+        return lst
+
+    def LIST_TO_TUPLE(decompiler):
+        tos = decompiler.stack.pop()
+        if not isinstance(tos, ast.List):
+            throw(InvalidQuery, "Translation error, please contact developers: list expected, got: %r" % tos)
+        return ast.Tuple(tos.elts, ast.Load())
 
     def LOAD_ATTR(decompiler, attr_name):
         return ast.Getattr(decompiler.stack.pop(), attr_name)
@@ -427,9 +494,11 @@ class Decompiler(object):
         decompiler.names.add(varname)
         return ast.Name(varname)
 
-    def LOAD_GLOBAL(decompiler, varname):
+    def LOAD_GLOBAL(decompiler, varname, push_null):
+        if push_null:
+            decompiler.stack.append(None)
         decompiler.names.add(varname)
-        return ast.Name(varname)
+        return ast.Name(varname, ast.Load())
 
     def LOAD_METHOD(decompiler, methname):
         return decompiler.LOAD_ATTR(methname)
@@ -470,8 +539,44 @@ class Decompiler(object):
         flags = 0  # todo
         return ast.Lambda(argnames, defaults, flags, func_decompiler.ast)
 
+    def conditional_jump_none_impl(decompiler, endpos, negate):
+        expr = decompiler.stack.pop()
+        assert(decompiler.pos < decompiler.conditions_end)
+        if decompiler.pos in decompiler.or_jumps:
+            clausetype = ast.Or
+            op = ast.IsNot if negate else ast.Is
+        else:
+            clausetype = ast.And
+            op = ast.Is if negate else ast.IsNot
+        expr = ast.Compare(expr, [op()], [ast.Constant(None)])
+        decompiler.stack.append(expr)
+
+        if decompiler.next_pos in decompiler.targets:
+            decompiler.process_target(decompiler.next_pos)
+
+        expr = decompiler.stack.pop()
+        clause = ast.BoolOp(op=clausetype(), values=[expr])
+        clause.endpos = endpos
+        decompiler.targets.setdefault(endpos, clause)
+        return clause
+
+    def jump_if_none(decompiler, endpos):
+        return decompiler.conditional_jump_none_impl(endpos, False)
+
+    def jump_if_not_none(decompiler, endpos):
+        return decompiler.conditional_jump_none_impl(endpos, True)
+
+
+    POP_JUMP_BACKWARD_IF_FALSE = JUMP_IF_FALSE
+    POP_JUMP_BACKWARD_IF_TRUE = JUMP_IF_TRUE
+    POP_JUMP_FORWARD_IF_FALSE = JUMP_IF_FALSE
+    POP_JUMP_FORWARD_IF_TRUE = JUMP_IF_TRUE
     POP_JUMP_IF_FALSE = JUMP_IF_FALSE
     POP_JUMP_IF_TRUE = JUMP_IF_TRUE
+    POP_JUMP_BACKWARD_IF_NONE = jump_if_none
+    POP_JUMP_BACKWARD_IF_NOT_NONE = jump_if_not_none
+    POP_JUMP_FORWARD_IF_NONE = jump_if_none
+    POP_JUMP_FORWARD_IF_NOT_NONE = jump_if_not_none
 
     def POP_TOP(decompiler):
         pass
@@ -482,6 +587,12 @@ class Decompiler(object):
         expr = decompiler.stack.pop()
         decompiler.stack.append(simplify(expr))
         raise AstGenerated()
+
+    def RETURN_GENERATOR(decompiler):
+        pass
+
+    def RESUME(decompiler, where):
+        pass
 
     def ROT_TWO(decompiler):
         tos = decompiler.stack.pop()
